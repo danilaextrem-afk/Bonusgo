@@ -168,6 +168,16 @@ export const payments = pgTable("payments", {
   createdAt: created(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
   refundedAt: timestamp("refunded_at", { withTimezone: true }),
+  // Manual SBP transfers: customer claims payment, plan is granted for a short grace period until admin confirms.
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  graceApplied: boolean("grace_applied").notNull().default(false),
+  prevPlan: plan("prev_plan"),
+  prevPlanExpiresAt: timestamp("prev_plan_expires_at", { withTimezone: true }),
+  payerInn: text("payer_inn"),
+  payerName: text("payer_name"),
+  // НПД receipt ("Мой налог") issued automatically on confirmation.
+  npdReceiptId: text("npd_receipt_id"),
+  npdError: text("npd_error"),
 }, (t) => [index("payments_company_idx").on(t.companyId), index("payments_status_created").on(t.status, t.createdAt)]);
 
 export const paymentEvents = pgTable("payment_events", {

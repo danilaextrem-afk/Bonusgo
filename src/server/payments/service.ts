@@ -15,15 +15,8 @@ export function priceFor(country: CountryCode, plan: PaidPlan, months: Months): 
   return PLAN_PRICES[country][plan] * MONTH_MULT[months];
 }
 
-export function addMonths(d: Date, n: number): Date {
-  const r = new Date(d);
-  const day = r.getUTCDate();
-  r.setUTCDate(1);
-  r.setUTCMonth(r.getUTCMonth() + n);
-  const last = new Date(Date.UTC(r.getUTCFullYear(), r.getUTCMonth() + 1, 0)).getUTCDate();
-  r.setUTCDate(Math.min(day, last));
-  return r;
-}
+export { addMonths } from "./dates";
+import { addMonths } from "./dates";
 
 export async function createPaymentOrder(companyId: string, plan: PaidPlan, months: Months) {
   if (plan !== "PRO" && plan !== "TOP") throw new PaymentError("Неизвестный тариф", "bad_plan");
@@ -31,7 +24,8 @@ export async function createPaymentOrder(companyId: string, plan: PaidPlan, mont
   const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, companyId)).limit(1);
   if (!company || company.deletedAt) throw new PaymentError("Компания не найдена", "no_company");
   const provider = providerFor(company.country);
-  const test = testModeOn() || !provider.isLive();
+  // Manual SBP transfers are always real money; other providers are test unless live.
+  const test = provider.id === "sbp" ? false : testModeOn() || !provider.isLive();
   if (!provider.isConfigured() || (provider.id !== "mock" && !testModeOn() && !provider.isLive())) {
     throw new PaymentError("Приём платежей для вашей страны пока не подключён", "payments_unavailable");
   }

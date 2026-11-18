@@ -6,6 +6,10 @@ import { requireCompanyContext, sp1 } from "@/components/app/data";
 import { COUNTRY, PLAN_LIMITS, PLAN_PRICES, formatMoney, type PlanId } from "@/lib/plans";
 import { getCsrfToken } from "@/server/auth/session";
 import { getUsage } from "@/server/limits";
+import { and, desc, eq } from "drizzle-orm";
+import Link from "next/link";
+import { db, schema } from "@/server/db";
+import { receiptUrl } from "@/server/payments/npd";
 import { cancelSubscriptionAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +23,11 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const status = sp1(sp.status);
   const { company, plan, role } = await requireCompanyContext();
-  const [usage, csrf] = await Promise.all([getUsage(company.id), getCsrfToken()]);
+  const [usage, csrf, history] = await Promise.all([
+    getUsage(company.id),
+    getCsrfToken(),
+    db.select().from(schema.payments).where(and(eq(schema.payments.companyId, company.id), eq(schema.payments.testMode, false))).orderBy(desc(schema.payments.createdAt)).limit(12),
+  ]);
   const cur = COUNTRY[company.country].currency;
   const isOwner = role === "OWNER";
   const rank: Record<PlanId, number> = { FREE: 0, PRO: 1, TOP: 2 };
@@ -28,6 +36,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       <PageHeader title="Тариф и оплата" subtitle={`Сейчас: ${PLAN_NAMES[plan]}${company.planExpiresAt && plan !== "FREE" ? ` · действует до ${formatDate(company.planExpiresAt).split(",")[0]}` : ""}`} />
       <div className="space-y-4">
         {status === "success" && <Notice tone="ok">Оплата прошла. Тариф обновится в течение минуты — если нет, обновите страницу.</Notice>}
+        {status === "unavailable" && <Notice tone="warn">Оплата временно недоступна. Попробуйте позже или напишите нам.</Notice>}
         {status === "fail" && <Notice tone="danger">Оплата не прошла. Деньги не списаны. Попробуйте ещё раз или другой способ оплаты.</Notice>}
         {company.country === "BY" && (
           <Notice tone="warn">Оплата в BYN появится после подключения платёжного провайдера. Цены ниже ориентировочные и подтверждаются при запуске оплаты.</Notice>
@@ -83,6 +92,24 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
             );
           })}
         </div>
+
+        {history.length > 0 && (
+          <div className="card">
+            <h2 className="mb-3 font-semibold">История оплат</h2>
+            <ul className="divide-y divide-line text-sm">
+              {history.map((h) => (
+                <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <span>{h.plan} · {h.months} мес · {formatMoney(h.amountMinor, h.currency)}</span>
+                  <span className="text-muted">
+                    {h.status === "PAID" ? "оплачено" : h.status === "PENDING" ? (h.claimedAt ? "на проверке" : "ожидает оплаты") : h.status === "FAILED" ? "не прошла" : h.status.toLowerCase()}
+                    {h.status === "PENDING" && !h.claimedAt && h.provider === "sbp" && <> · <Link className="text-neon underline" href={`/app/billing/sbp/${h.id}`}>оплатить</Link></>}
+                    {h.npdReceiptId && <> · <a className="text-neon underline" href={receiptUrl(h.npdReceiptId)} target="_blank" rel="noreferrer">чек</a></>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {plan !== "FREE" && isOwner && (
           <div className="card">

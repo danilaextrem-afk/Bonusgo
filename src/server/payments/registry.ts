@@ -2,10 +2,11 @@ import type { CountryCode } from "@/lib/plans";
 import { bepaid } from "./bepaid";
 import { mock } from "./mock";
 import { robokassa } from "./robokassa";
+import { sbp } from "./sbp";
 import { testModeOn, type PaymentProvider, type ProviderId } from "./types";
 import { webpay } from "./webpay";
 
-export const PROVIDERS: Record<ProviderId, PaymentProvider> = { robokassa, bepaid, webpay, mock };
+export const PROVIDERS: Record<ProviderId, PaymentProvider> = { robokassa, bepaid, webpay, mock, sbp };
 
 /**
  * RU -> Robokassa; BY -> bePaid (WEBPAY is a documented stub).
@@ -14,6 +15,8 @@ export const PROVIDERS: Record<ProviderId, PaymentProvider> = { robokassa, bepai
 export function providerFor(country: CountryCode): PaymentProvider {
   const real = country === "RU" ? robokassa : bepaid;
   if (real.isConfigured()) return real;
+  // RU without an acquiring contract: manual SBP transfer to the owner's account (SBP_PHONE).
+  if (country === "RU" && sbp.isConfigured()) return sbp;
   if (testModeOn()) return mock;
   return real; // unconfigured: createPaymentOrder will refuse
 }

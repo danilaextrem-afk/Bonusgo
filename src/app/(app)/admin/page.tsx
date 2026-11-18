@@ -7,6 +7,8 @@ import { db, schema } from "@/server/db";
 import { requirePlatformAdmin } from "@/server/auth/session";
 import { getPlatformStats } from "@/server/loyalty/service";
 import { getPaymentDiagnostics } from "@/server/payments/service";
+import { listSbpClaims } from "@/server/payments/sbp";
+import { SbpClaims } from "@/components/app/SbpClaims";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Админ-панель", robots: { index: false, follow: false } };
@@ -58,7 +60,7 @@ function Block({ title, data }: { title: string; data: unknown }) {
 
 export default async function AdminPage() {
   await requirePlatformAdmin();
-  const [stats, diag, errors, failed] = await Promise.all([
+  const [stats, diag, errors, failed, claims] = await Promise.all([
     getPlatformStats(),
     getPaymentDiagnostics(),
     db
@@ -68,13 +70,19 @@ export default async function AdminPage() {
       .orderBy(desc(schema.auditLogs.createdAt))
       .limit(20),
     db.select().from(schema.payments).where(eq(schema.payments.status, "FAILED")).orderBy(desc(schema.payments.createdAt)).limit(10),
+    listSbpClaims(30),
   ]);
+  const pending = claims.filter((c) => c.payment.status === "PENDING").length;
   const notes = (process.env.FREE_TIER_NOTES ?? "").split(/\r?\n|\|/).map((s) => s.trim()).filter(Boolean);
 
   return (
     <main className="container-x py-8">
       <h1 className="mb-1 text-2xl font-bold">Админ-панель</h1>
       <p className="mb-6 text-sm text-muted">Валюты RUB и BYN показаны раздельно и никогда не суммируются.</p>
+
+      <h2 className="mb-3 font-semibold">Оплаты по СБП {pending > 0 && <span className="badge ml-2">ждут: {pending}</span>}</h2>
+      <p className="mb-3 text-sm text-muted">Проверьте поступление в приложении Т-Банка по сумме и коду в комментарии, затем подтвердите.</p>
+      <div className="mb-8"><SbpClaims claims={claims} /></div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Block title="Россия" data={pick(stats, "RU", "ru", "russia")} />

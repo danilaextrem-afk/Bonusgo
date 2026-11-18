@@ -84,14 +84,16 @@ test("core user journey", async ({ browser, baseURL }, testInfo) => {
   await bp.goto("/app/billing");
   await expect(bp.getByText("Сейчас: Бесплатный", { exact: false })).toBeVisible();
 
-  // 6. Billing: PRO 1 month via mock provider
+  // 6. Billing via mock provider (only when the server runs without manual SBP)
   const companyId = await bp.locator('input[name="companyId"]').first().inputValue();
   expect(companyId.length).toBeGreaterThan(5);
-  const proForm = bp.locator("form", { has: bp.locator('input[name="plan"][value="PRO"]') });
-  await proForm.locator('input[name="months"][value="1"]').check({ force: true });
-  await proForm.locator('button[type="submit"]').click();
-  await bp.waitForURL(/\/app\/billing\?status=success/);
-  await expect(bp.getByText("Сейчас: PRO", { exact: false })).toBeVisible();
+  if (!process.env.SBP_PHONE) {
+    const proForm = bp.locator("form", { has: bp.locator('input[name="plan"][value="PRO"]') });
+    await proForm.locator('input[name="months"][value="1"]').check({ force: true });
+    await proForm.locator('button[type="submit"]').click();
+    await bp.waitForURL(/\/app\/billing\?status=success/);
+    await expect(bp.getByText("Сейчас: PRO", { exact: false })).toBeVisible();
+  }
 
   // 7. Tenant isolation
   const p2 = await biz2.newPage();

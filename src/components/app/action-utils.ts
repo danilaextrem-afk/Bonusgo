@@ -1,3 +1,4 @@
+import { PaymentError } from "@/server/payments/types";
 import "server-only";
 import { ZodError, type ZodType } from "zod";
 import { AppError } from "@/server/errors";
@@ -31,6 +32,7 @@ function isNextControl(e: unknown): boolean {
 
 export function describeError(e: unknown): { error: string; upsell?: boolean } {
   if (e instanceof UiError) return { error: e.message, upsell: e.upsell };
+  if (e instanceof PaymentError) return { error: e.message };
   if (e instanceof ZodError) return { error: e.issues[0]?.message ?? "Проверьте введённые данные" };
   if (e instanceof AppError) {
     if (e.code === "PLAN_LIMIT") return { error: e.message, upsell: true };

@@ -1,6 +1,6 @@
 import type { schema } from "@/server/db";
 
-export type ProviderId = "robokassa" | "bepaid" | "webpay" | "mock";
+export type ProviderId = "robokassa" | "bepaid" | "webpay" | "mock" | "sbp";
 export type PaymentRow = typeof schema.payments.$inferSelect;
 export type CompanyRow = typeof schema.companies.$inferSelect;
 export type NotificationKind = "paid" | "failed" | "refunded";
