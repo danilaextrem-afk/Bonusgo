@@ -53,7 +53,7 @@ export function PricingTable({ country }: { country: CP }) {
   return (
     <div className="overflow-x-auto rounded-[18px] border border-line bg-surface">
       <table className="w-full min-w-[560px] border-collapse text-left text-sm">
-        <caption className="sr-only">Сравнение тарифов BONUSGO</caption>
+        <caption className="sr-only">Сравнение тарифов QRonus</caption>
         <thead>
           <tr className="border-b border-line bg-surface-2">
             <th scope="col" className="px-4 py-3 font-semibold text-muted">Возможность</th>

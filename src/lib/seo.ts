@@ -4,7 +4,7 @@ export type CP = "ru" | "by";
 export const COUNTRY_PATHS: CP[] = ["ru", "by"];
 
 export const SITE_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
-export const SITE_NAME = "BONUSGO";
+export const SITE_NAME = "QRonus";
 
 export function absoluteUrl(path: string): string {
   if (/^https?:\/\//.test(path)) return path;
@@ -34,8 +34,8 @@ export interface MetaInput {
 const OG_LOCALE: Record<CP, string> = { ru: "ru_RU", by: "ru_BY" };
 
 function withBrand(title: string): string {
-  if (/bonusgo/i.test(title)) return title;
-  return title.length + 10 <= 65 ? `${title} — BONUSGO` : title;
+  if (/qronus/i.test(title)) return title;
+  return title.length + 10 <= 65 ? `${title} — QRonus` : title;
 }
 
 export function buildMetadata(input: MetaInput): Metadata {
@@ -55,7 +55,7 @@ export function buildMetadata(input: MetaInput): Metadata {
     };
   }
 
-  const images = [{ url: absoluteUrl("/opengraph-image"), width: 1200, height: 630, alt: "BONUSGO" }];
+  const images = [{ url: absoluteUrl("/opengraph-image"), width: 1200, height: 630, alt: "QRonus" }];
   const meta: Metadata = {
     title: { absolute: title },
     description,

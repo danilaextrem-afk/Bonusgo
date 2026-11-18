@@ -36,7 +36,7 @@ export function ProgramCost({ country, shareable = true }: { country: CP; sharea
         <>
           <div className="grid gap-3 sm:grid-cols-2">
             <Stat label="Награды в месяц" value={money(rewards, cur)} sub="одинаково для любого формата карты" />
-            <Stat accent label={plan ? `Тариф BONUSGO: ${plan === "FREE" ? "бесплатный" : plan}` : "Тариф BONUSGO"} value={plan ? money(planPrice, cur) : "по запросу"} sub={plan ? "в месяц" : "клиентов больше лимита тарифа TOP"} />
+            <Stat accent label={plan ? `Тариф QRonus: ${plan === "FREE" ? "бесплатный" : plan}` : "Тариф QRonus"} value={plan ? money(planPrice, cur) : "по запросу"} sub={plan ? "в месяц" : "клиентов больше лимита тарифа TOP"} />
             <Stat label="Бумажные карты в месяц" value={money(paper, cur)} sub="печать с учётом потерь" />
             <Stat label="Итого: цифровая карта" value={plan ? money(digitalTotal, cur) : "—"} sub={`бумажная: ${money(paperTotal, cur)}`} />
           </div>

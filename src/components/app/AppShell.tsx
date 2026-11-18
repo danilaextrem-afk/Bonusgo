@@ -50,7 +50,7 @@ export function AppShell({
   return (
     <div className="min-h-dvh lg:flex">
       <aside className="hidden w-64 shrink-0 flex-col gap-5 border-r border-line bg-surface p-4 lg:flex lg:sticky lg:top-0 lg:h-dvh lg:overflow-y-auto">
-        <Link href="/app" className="text-xl font-extrabold tracking-tight">BONUS<span className="glow-text">GO</span></Link>
+        <Link href="/app" className="text-xl font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
         {currentId && currentName && (
           <div className="space-y-3">
             <div>
@@ -68,7 +68,7 @@ export function AppShell({
       </aside>
       <div className="min-w-0 flex-1">
         <header className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3 lg:hidden">
-          <Link href="/app" className="text-lg font-extrabold tracking-tight">BONUS<span className="glow-text">GO</span></Link>
+          <Link href="/app" className="text-lg font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
           <div className="flex min-w-0 items-center gap-2">
             {currentName && <span className="max-w-[40vw] truncate text-xs text-muted">{currentName}</span>}
             {plan && <span className="badge">{PLAN_NAMES[plan]}</span>}

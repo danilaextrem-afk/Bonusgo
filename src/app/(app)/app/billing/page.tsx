@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 const FEATURES: Record<Exclude<PlanId, "FREE">, string[]> = {
   PRO: ["До 1000 активных клиентов", "3 программы, баллы и награды", "История операций и аналитика", "До 3 сотрудников", "Свой логотип и цвет"],
-  TOP: ["До 10 000 клиентов, 20 заведений", "50 программ, 100 сотрудников", "Экспорт CSV", "Без метки BONUSGO на плакате", "Реферальная программа"],
+  TOP: ["До 10 000 клиентов, 20 заведений", "50 программ, 100 сотрудников", "Экспорт CSV", "Без метки QRonus на плакате", "Реферальная программа"],
 };
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

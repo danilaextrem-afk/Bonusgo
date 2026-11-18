@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-const KEY = "bonusgo:install-dismissed";
+const KEY = "qronus:install-dismissed";
 
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 

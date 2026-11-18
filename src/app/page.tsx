@@ -12,7 +12,7 @@ import { buildMetadata } from "@/lib/seo";
 export const metadata: Metadata = buildMetadata({
   country: null,
   path: "/",
-  title: "BONUSGO — цифровые бонусные карты для бизнеса",
+  title: "QRonus — цифровые бонусные карты для бизнеса",
   description: "Бонусные карты по QR для кофеен, барбершопов, салонов и автомоек. Выберите страну: Россия или Беларусь.",
 });
 
@@ -52,7 +52,7 @@ export default function RootPage() {
       </main>
       <footer className="border-t border-line">
         <div className="container-x flex flex-wrap gap-x-6 gap-y-2 py-6 text-xs text-muted">
-          <span>© {new Date().getFullYear()} BONUSGO</span>
+          <span>© {new Date().getFullYear()} QRonus</span>
           <Link href="/ru/politika-konfidencialnosti" className="hover:text-neon">Политика конфиденциальности</Link>
           <Link href="/ru/usloviya" className="hover:text-neon">Условия</Link>
           <Link href="/ru/cookies" className="hover:text-neon">Cookies</Link>

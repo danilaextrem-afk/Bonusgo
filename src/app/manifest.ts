@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "BONUSGO — мои бонусные карты",
-    short_name: "BONUSGO",
+    name: "QRonus — мои бонусные карты",
+    short_name: "QRonus",
     description: "Ваши бонусные карты всегда под рукой.",
     lang: "ru",
     start_url: "/me",

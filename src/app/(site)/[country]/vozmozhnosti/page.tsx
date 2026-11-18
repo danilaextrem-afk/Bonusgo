@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ country: 
     country: c,
     path: "/vozmozhnosti",
     title: "Возможности цифровой бонусной карты",
-    description: "Штампы и баллы, награды, подтверждение начисления сотрудником, одноразовый QR клиента, аналитика визитов. Что умеет BONUSGO.",
+    description: "Штампы и баллы, награды, подтверждение начисления сотрудником, одноразовый QR клиента, аналитика визитов. Что умеет QRonus.",
   });
 }
 
@@ -35,7 +35,7 @@ export default async function Page({ params }: { params: Promise<{ country: stri
     <>
       <PageHeader
         crumbs={[{ name: "Главная", href: `/${c}` }, { name: "Возможности" }]}
-        h1="Возможности BONUSGO"
+        h1="Возможности QRonus"
         lead="Простая программа лояльности для малого бизнеса: клиент не устанавливает приложение, а сотрудник контролирует каждое начисление."
       />
       <Section>

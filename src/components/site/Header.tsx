@@ -7,8 +7,8 @@ import { CountrySwitch } from "./CountrySwitch";
 
 export function Logo({ href }: { href: string }) {
   return (
-    <Link href={href} aria-label="BONUSGO — на главную" className="text-xl font-extrabold tracking-tight text-text">
-      BONUS<span className="text-neon">GO</span>
+    <Link href={href} aria-label="QRonus — на главную" className="text-xl font-extrabold tracking-tight text-text">
+      <span className="text-neon">QR</span>onus
     </Link>
   );
 }

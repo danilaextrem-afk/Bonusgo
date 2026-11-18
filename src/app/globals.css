@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* BONUSGO design tokens: graphite + neon green */
+/* QRonus design tokens: graphite + neon green */
 @theme {
   --color-bg: #0b0d0e;
   --color-surface: #131618;

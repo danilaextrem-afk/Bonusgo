@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     return new Response("﻿" + csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="bonusgo-${new Date().toISOString().slice(0, 10)}.csv"`,
+        "Content-Disposition": `attachment; filename="qronus-${new Date().toISOString().slice(0, 10)}.csv"`,
         "Cache-Control": "no-store",
       },
     });

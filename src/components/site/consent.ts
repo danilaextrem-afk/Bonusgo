@@ -1,5 +1,5 @@
-export const CONSENT_KEY = "bonusgo_cookie_consent";
-export const CONSENT_EVENT = "bonusgo:consent";
+export const CONSENT_KEY = "qronus_cookie_consent";
+export const CONSENT_EVENT = "qronus:consent";
 export type Consent = "accepted" | "declined";
 
 export function readConsent(): Consent | null {

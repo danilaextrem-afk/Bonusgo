@@ -57,7 +57,7 @@ export default async function StaffPage() {
         ) : (
           <div className="card">
             <h2 className="mb-1 font-semibold">Добавить сотрудника</h2>
-            <p className="mb-3 text-xs text-muted">Человек должен сначала зарегистрироваться в BONUSGO с этим email.</p>
+            <p className="mb-3 text-xs text-muted">Человек должен сначала зарегистрироваться в QRonus с этим email.</p>
             <ActionForm action={addStaffAction} className="space-y-4" resetOnOk>
               <input type="hidden" name="companyId" value={company.id} />
               <Field label="Email"><input className="input" type="email" name="email" required /></Field>

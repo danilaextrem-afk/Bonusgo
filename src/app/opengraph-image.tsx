@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "BONUSGO — digital loyalty cards";
+export const alt = "QRonus — digital loyalty cards";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -21,7 +21,7 @@ export default function OpengraphImage() {
         }}
       >
         <div style={{ display: "flex", fontSize: 128, fontWeight: 800, letterSpacing: -4 }}>
-          BONUS<span style={{ color: "#39ff88" }}>GO</span>
+          <span style={{ color: "#39ff88" }}>QR</span>onus
         </div>
         <div style={{ marginTop: 24, fontSize: 44, color: "#9aa4ab" }}>Digital stamp cards via QR for small business</div>
         <div style={{ display: "flex", marginTop: 48 }}>

@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ country: 
   return buildMetadata({
     country: c,
     path: "/tarify",
-    title: `Тарифы BONUSGO в ${currencyOf(c) === "RUB" ? "рублях" : "белорусских рублях"}`,
+    title: `Тарифы QRonus в ${currencyOf(c) === "RUB" ? "рублях" : "белорусских рублях"}`,
     description: "Бесплатный тариф и платные PRO и TOP: лимиты клиентов, программ и сотрудников, сравнение возможностей и способы оплаты.",
   });
 }
@@ -36,9 +36,9 @@ export default async function Page({ params }: { params: Promise<{ country: stri
   const ld = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: "BONUSGO — цифровые бонусные карты",
+    name: "QRonus — цифровые бонусные карты",
     description: "Сервис цифровых бонусных карт и программ лояльности для малого бизнеса.",
-    brand: { "@type": "Brand", name: "BONUSGO" },
+    brand: { "@type": "Brand", name: "QRonus" },
     offers: [offer("Бесплатный", 0), offer("PRO", prices.PRO), offer("TOP", prices.TOP)],
   };
   const faq = [
@@ -50,7 +50,7 @@ export default async function Page({ params }: { params: Promise<{ country: stri
     <>
       <PageHeader
         crumbs={[{ name: "Главная", href: `/${c}` }, { name: "Тарифы" }]}
-        h1="Тарифы BONUSGO"
+        h1="Тарифы QRonus"
         lead={`Цены указаны в ${currency === "RUB" ? "российских рублях" : "белорусских рублях"} за месяц. Начните бесплатно и переходите на платный тариф, когда клиентов станет больше.`}
       />
       <Section>

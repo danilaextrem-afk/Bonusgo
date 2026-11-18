@@ -66,7 +66,7 @@ async function login(): Promise<string> {
   const r = await call<{ token: string; tokenExpireIn?: string }>("/auth/lkfl", {
     username: process.env.NALOG_INN,
     password: process.env.NALOG_PASSWORD,
-    deviceInfo: { sourceDeviceId: deviceId, sourceType: "WEB", appVersion: "1.0.0", metaDetails: { userAgent: "BONUSGO" } },
+    deviceInfo: { sourceDeviceId: deviceId, sourceType: "WEB", appVersion: "1.0.0", metaDetails: { userAgent: "QRonus" } },
   });
   const until = r.tokenExpireIn ? new Date(r.tokenExpireIn).getTime() - 60_000 : Date.now() + 30 * 60_000;
   cached = { token: r.token, until };

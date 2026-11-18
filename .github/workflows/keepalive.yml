@@ -14,4 +14,4 @@ jobs:
     steps:
       - name: Ping health check
         run: |
-          curl -fsS --retry 3 --retry-delay 20 -m 90 "${{ vars.APP_URL || 'https://bonusgo.onrender.com' }}/api/health" || echo "site did not respond"
+          curl -fsS --retry 3 --retry-delay 20 -m 90 "${{ vars.APP_URL || 'https://qronus.onrender.com' }}/api/health" || echo "site did not respond"

@@ -57,7 +57,7 @@ export function Footer({ country, owner }: { country: CP; owner?: string }) {
       </div>
       <div className="border-t border-line">
         <div className="container-x flex flex-col gap-1 py-5 text-xs text-muted sm:flex-row sm:justify-between">
-          <p>© {new Date().getFullYear()} BONUSGO{owner ? ` · ${owner}` : ""}</p>
+          <p>© {new Date().getFullYear()} QRonus{owner ? ` · ${owner}` : ""}</p>
           <p>Демо-примеры на сайте носят иллюстративный характер.</p>
         </div>
       </div>

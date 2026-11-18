@@ -59,7 +59,7 @@ export async function GET(req: Request) {
     if (q.data.format === "png") {
       const buf = await QRCode.toBuffer(url, { width: 1024, margin: 2, errorCorrectionLevel: "M" });
       return new Response(new Uint8Array(buf), {
-        headers: { "Content-Type": "image/png", "Content-Disposition": `attachment; filename="bonusgo-qr-${venue.slug}.png"`, "Cache-Control": "no-store" },
+        headers: { "Content-Type": "image/png", "Content-Disposition": `attachment; filename="qronus-qr-${venue.slug}.png"`, "Cache-Control": "no-store" },
       });
     }
 
@@ -118,14 +118,14 @@ export async function GET(req: Request) {
     page.drawText(hint, { x: (W - regular.widthOfTextAtSize(hint, hs)) / 2, y: qy - hs * 2, size: hs, font: regular, color: ink });
 
     if (!limits.removeBranding) {
-      const brand = "Создано в BONUSGO";
+      const brand = "Создано в QRonus";
       const bs = W * 0.026;
       page.drawText(brand, { x: (W - regular.widthOfTextAtSize(brand, bs)) / 2, y: H * 0.035, size: bs, font: regular, color: rgb(0.45, 0.48, 0.5) });
     }
 
     const bytes = await pdf.save();
     return new Response(new Uint8Array(bytes), {
-      headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="bonusgo-poster-${q.data.format}-${venue.slug}.pdf"`, "Cache-Control": "no-store" },
+      headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="qronus-poster-${q.data.format}-${venue.slug}.pdf"`, "Cache-Control": "no-store" },
     });
   } catch (e) {
     if (e instanceof AppError) return fail(e.status, e.code, e.message);

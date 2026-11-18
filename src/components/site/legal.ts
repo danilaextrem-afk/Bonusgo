@@ -30,7 +30,7 @@ function fillPlaceholders(md: string): string {
     CONTACT_EMAIL: contactEmail(),
     PRIVACY_EMAIL: process.env.PRIVACY_EMAIL || contactEmail(),
     SITE_URL: process.env.APP_URL,
-    SITE_NAME: "BONUSGO",
+    SITE_NAME: "QRonus",
   };
   return md.replace(/\{\{\s*([A-Z0-9_]+)\s*\}\}/g, (_, key: string) => env[key] || PLACEHOLDER);
 }

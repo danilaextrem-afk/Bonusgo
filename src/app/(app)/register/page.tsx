@@ -39,7 +39,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
 
   return (
     <main className="container-x flex min-h-dvh max-w-md flex-col justify-center py-10">
-      <Link href="/" className="mb-6 text-2xl font-extrabold tracking-tight">BONUS<span className="glow-text">GO</span></Link>
+      <Link href="/" className="mb-6 text-2xl font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
       <div className="card">
         <h1 className="mb-1 text-xl font-bold">Регистрация</h1>
         <p className="mb-4 text-sm text-muted">{role === "business" ? "Создайте бонусную карту для своего заведения." : "Копите бонусы в любимых заведениях."}</p>

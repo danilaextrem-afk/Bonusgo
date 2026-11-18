@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ country: 
   const c = parseCountry((await params).country);
   if (!c) return {};
   const doc = await loadLegal("cookies", c);
-  return buildMetadata({ country: c, path: "/cookies", title: TITLE, description: "Какие cookies использует сайт BONUSGO, зачем они нужны и как отказаться от аналитики.", noindex: !doc });
+  return buildMetadata({ country: c, path: "/cookies", title: TITLE, description: "Какие cookies использует сайт QRonus, зачем они нужны и как отказаться от аналитики.", noindex: !doc });
 }
 
 export default async function Page({ params }: { params: Promise<{ country: string }> }) {

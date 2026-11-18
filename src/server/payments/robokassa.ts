@@ -51,7 +51,7 @@ export const robokassa: PaymentProvider = {
     const c = creds(test);
     if (!c.login || !c.p1) throw new PaymentError("Robokassa не настроена", "not_configured");
     const outSum = formatMajor(payment.amountMinor);
-    const description = `BONUSGO: тариф ${payment.plan}, ${payment.months} мес.`;
+    const description = `QRonus: тариф ${payment.plan}, ${payment.months} мес.`;
     const shp = { Shp_company: company.id, Shp_plan: payment.plan };
     let receiptRaw: string | undefined;
     if (process.env.ROBOKASSA_SEND_RECEIPT === "true") {

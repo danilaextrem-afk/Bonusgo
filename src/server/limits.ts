@@ -87,7 +87,7 @@ export async function assertCanAddActiveCustomer(companyId: string): Promise<voi
 
 const FEATURE_NAMES: Partial<Record<keyof PlanLimits, string>> = {
   pointsPrograms: "Бальные программы", customBranding: "Свой брендинг", rewards: "Награды", history: "История операций",
-  advancedAnalytics: "Расширенная аналитика", referrals: "Реферальная программа", export: "Экспорт данных", removeBranding: "Отключение брендинга BONUSGO", automation: "Автоматизация",
+  advancedAnalytics: "Расширенная аналитика", referrals: "Реферальная программа", export: "Экспорт данных", removeBranding: "Отключение брендинга QRonus", automation: "Автоматизация",
 };
 
 export async function assertFeature(companyId: string, feature: keyof PlanLimits): Promise<void> {

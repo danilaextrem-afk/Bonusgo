@@ -5,7 +5,7 @@ const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
-  title: { default: "BONUSGO — цифровые бонусные карты для бизнеса", template: "%s — BONUSGO" },
+  title: { default: "QRonus — цифровые бонусные карты для бизнеса", template: "%s — QRonus" },
   description: "Электронные бонусные карты и программы лояльности для кофеен, барбершопов, салонов и автомоек в России и Беларуси. Без приложения, через QR-код.",
   icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
   verification: {

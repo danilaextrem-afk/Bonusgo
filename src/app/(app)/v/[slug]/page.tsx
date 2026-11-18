@@ -73,7 +73,7 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
       </div>
       {showFooter && (
         <p className="mt-4 text-center text-xs text-muted">
-          <Link href={`/${home}`} className="underline underline-offset-4">Создать свою бонусную карту — BONUSGO</Link>
+          <Link href={`/${home}`} className="underline underline-offset-4">Создать свою бонусную карту — QRonus</Link>
         </p>
       )}
     </main>

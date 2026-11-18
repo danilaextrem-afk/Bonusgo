@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Logo } from "@/components/site/Header";
 
-export const metadata: Metadata = { title: { absolute: "Страница не найдена — BONUSGO" }, robots: { index: false, follow: true } };
+export const metadata: Metadata = { title: { absolute: "Страница не найдена — QRonus" }, robots: { index: false, follow: true } };
 
 const LINKS = [
   { href: "/ru", label: "Главная · Россия" },

@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
-      APP_URL: ${{ vars.APP_URL || 'https://bonusgo.onrender.com' }}
+      APP_URL: ${{ vars.APP_URL || 'https://qronus.onrender.com' }}
     steps:
       - name: Skip until CRON_SECRET is configured
         if: env.CRON_SECRET == ''

@@ -157,7 +157,7 @@ export async function issueSbpReceipt(paymentId: string): Promise<{ ok: boolean;
   const months = row.p.months;
   try {
     const id = await issueReceipt({
-      serviceName: `Подписка BONUSGO ${row.p.plan}, ${months} мес. (${paymentCode(row.p.invoiceNo)})`,
+      serviceName: `Подписка QRonus ${row.p.plan}, ${months} мес. (${paymentCode(row.p.invoiceNo)})`,
       amountMinor: row.p.amountMinor,
       operationTime: row.p.claimedAt ?? row.p.paidAt ?? new Date(),
       client: inn ? { type: "FROM_LEGAL_ENTITY", inn, displayName: row.p.payerName ?? row.c.legalName ?? row.c.name } : { type: "FROM_INDIVIDUAL" },

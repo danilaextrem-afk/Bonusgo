@@ -1,4 +1,4 @@
-// BONUSGO data model (Drizzle). Every business-owned row carries companyId for tenant isolation.
+// QRonus data model (Drizzle). Every business-owned row carries companyId for tenant isolation.
 import { pgTable, pgEnum, text, integer, boolean, timestamp, jsonb, serial, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createId } from "./id";
 

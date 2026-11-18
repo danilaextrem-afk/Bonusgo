@@ -1,7 +1,7 @@
 # Render Blueprint (free web service). DATABASE_URL points to Neon (set in Render dashboard / MCP, never in git).
 services:
   - type: web
-    name: bonusgo
+    name: qronus
     runtime: node
     plan: free
     region: frankfurt

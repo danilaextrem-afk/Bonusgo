@@ -27,7 +27,7 @@ export const bepaid: PaymentProvider = {
       checkout: {
         test: !this.isLive() || payment.testMode,
         transaction_type: "payment",
-        order: { amount: payment.amountMinor, currency: "BYN", description: `BONUSGO: тариф ${payment.plan}, ${payment.months} мес.`, tracking_id: String(payment.invoiceNo) },
+        order: { amount: payment.amountMinor, currency: "BYN", description: `QRonus: тариф ${payment.plan}, ${payment.months} мес.`, tracking_id: String(payment.invoiceNo) },
         settings: {
           notification_url: appUrl("/api/payments/bepaid/webhook"),
           success_url: appUrl("/app/billing?status=success"),

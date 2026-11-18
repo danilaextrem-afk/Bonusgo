@@ -100,10 +100,10 @@ describe("rate limiter", () => {
 
 describe("same-origin check", () => {
   it("accepts same origin, rejects cross-site and missing origin", () => {
-    expect(() => assertSameOrigin(setOrigin("https://bonusgo.ru", "bonusgo.ru"))).not.toThrow();
-    expect(() => assertSameOrigin(setOrigin("https://evil.ru", "bonusgo.ru"))).toThrow(ForbiddenError);
-    expect(() => assertSameOrigin(setOrigin(null, "bonusgo.ru"))).toThrow(ForbiddenError);
-    const r = new Request("https://internal/x", { method: "POST", headers: { origin: "https://bonusgo.by", host: "internal:3000", "x-forwarded-host": "bonusgo.by" } });
+    expect(() => assertSameOrigin(setOrigin("https://qronus.ru", "qronus.ru"))).not.toThrow();
+    expect(() => assertSameOrigin(setOrigin("https://evil.ru", "qronus.ru"))).toThrow(ForbiddenError);
+    expect(() => assertSameOrigin(setOrigin(null, "qronus.ru"))).toThrow(ForbiddenError);
+    const r = new Request("https://internal/x", { method: "POST", headers: { origin: "https://qronus.by", host: "internal:3000", "x-forwarded-host": "qronus.by" } });
     expect(() => assertSameOrigin(r)).not.toThrow();
   });
 });

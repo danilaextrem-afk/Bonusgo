@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ country: 
   return buildMetadata({
     country: c,
     path: "/faq",
-    title: "Вопросы и ответы о BONUSGO",
+    title: "Вопросы и ответы о QRonus",
     description: "Как работает цифровая бонусная карта, защита от накруток, тарифы, оплата и запуск программы лояльности в вашем заведении.",
   });
 }
@@ -22,7 +22,7 @@ export default async function Page({ params }: { params: Promise<{ country: stri
   if (!c) notFound();
   return (
     <>
-      <PageHeader crumbs={[{ name: "Главная", href: `/${c}` }, { name: "Вопросы и ответы" }]} h1="Вопросы и ответы" lead="Коротко о том, как работает BONUSGO, сколько стоит и как защищены начисления." />
+      <PageHeader crumbs={[{ name: "Главная", href: `/${c}` }, { name: "Вопросы и ответы" }]} h1="Вопросы и ответы" lead="Коротко о том, как работает QRonus, сколько стоит и как защищены начисления." />
       <Section>
         <div className="max-w-3xl"><Faq items={generalFaq(c)} /></div>
       </Section>

@@ -121,12 +121,12 @@ export function QrGenerator() {
       center("Наведите камеру телефона на QR-код", 118, 13, bold);
       center("и получите бонусную карту", 100, 13, font);
       page.drawLine({ start: { x: 60, y: 60 }, end: { x: W - 60, y: 60 }, thickness: 0.6, color: rgb(0.8, 0.82, 0.83) });
-      center("BONUSGO — цифровые бонусные карты", 40, 9, font, rgb(0.4, 0.43, 0.45));
+      center("QRonus — цифровые бонусные карты", 40, 9, font, rgb(0.4, 0.43, 0.45));
 
       const bytes = await doc.save();
       const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
-      download(url, "bonusgo-plakat-a5.pdf");
+      download(url, "qronus-plakat-a5.pdf");
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch {
       setErr("Не удалось собрать PDF. Попробуйте убрать необычные символы из названия.");
@@ -170,7 +170,7 @@ export function QrGenerator() {
           )}
         </div>
         <div className="flex w-full flex-wrap justify-center gap-3">
-          <button type="button" className="btn-primary" disabled={!png || !value} onClick={() => png && download(png, "bonusgo-qr.png")}>Скачать PNG</button>
+          <button type="button" className="btn-primary" disabled={!png || !value} onClick={() => png && download(png, "qronus-qr.png")}>Скачать PNG</button>
           <button type="button" className="btn-ghost" disabled={!png || !value || busy} onClick={makePdf}>{busy ? "Готовим PDF..." : "Плакат А5 (PDF)"}</button>
         </div>
         {err && <p role="alert" className="text-sm text-danger">{err}</p>}

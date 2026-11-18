@@ -9,7 +9,7 @@ import { buildMetadata } from "@/lib/seo";
 export async function generateMetadata({ params }: { params: Promise<{ country: string }> }): Promise<Metadata> {
   const c = parseCountry((await params).country);
   if (!c) return {};
-  return buildMetadata({ country: c, path: "/kontakty", title: "Контакты BONUSGO", description: "Как связаться с BONUSGO: электронная почта для вопросов о сервисе, партнёрстве и поддержке." });
+  return buildMetadata({ country: c, path: "/kontakty", title: "Контакты QRonus", description: "Как связаться с QRonus: электронная почта для вопросов о сервисе, партнёрстве и поддержке." });
 }
 
 export default async function Page({ params }: { params: Promise<{ country: string }> }) {

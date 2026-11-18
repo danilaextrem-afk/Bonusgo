@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: { params: Promise<{ country: 
   const c = parseCountry((await params).country);
   if (!c) return {};
   const doc = await loadLegal("terms", c);
-  return buildMetadata({ country: c, path: "/usloviya", title: TITLE, description: "Условия использования сервиса BONUSGO: права и обязанности сторон, тарифы, ответственность.", noindex: !doc });
+  return buildMetadata({ country: c, path: "/usloviya", title: TITLE, description: "Условия использования сервиса QRonus: права и обязанности сторон, тарифы, ответственность.", noindex: !doc });
 }
 
 export default async function Page({ params }: { params: Promise<{ country: string }> }) {

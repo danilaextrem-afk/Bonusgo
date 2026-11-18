@@ -43,7 +43,7 @@ export default async function QrPage({ searchParams }: { searchParams: Promise<R
             <a className="btn-primary" href={dl("a4")}>Плакат A4 (PDF)</a>
             <a className="btn-primary" href={dl("a5")}>Плакат A5 (PDF)</a>
           </div>
-          <p className="text-xs text-muted">Распечатайте плакат и поставьте у кассы. Метку «Создано в BONUSGO» можно убрать на тарифе TOP.</p>
+          <p className="text-xs text-muted">Распечатайте плакат и поставьте у кассы. Метку «Создано в QRonus» можно убрать на тарифе TOP.</p>
         </div>
       </div>
     </>

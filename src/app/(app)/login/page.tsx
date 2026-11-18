@@ -20,7 +20,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const qs = next ? `&next=${encodeURIComponent(next)}` : "";
   return (
     <main className="container-x flex min-h-dvh max-w-md flex-col justify-center py-10">
-      <Link href="/" className="mb-6 text-2xl font-extrabold tracking-tight">BONUS<span className="glow-text">GO</span></Link>
+      <Link href="/" className="mb-6 text-2xl font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
       <div className="card">
         <h1 className="mb-4 text-xl font-bold">Вход</h1>
         {isDemoMode() && <div className="mb-4"><Notice tone="warn">Тестовый режим: не вводите реальные персональные данные</Notice></div>}

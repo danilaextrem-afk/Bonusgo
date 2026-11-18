@@ -38,7 +38,7 @@ test("SBP: pay → instant grace → admin confirms", async ({ browser }, info) 
 
   // Platform admin (ADMIN_EMAILS) confirms
   const ap = await adm.newPage();
-  const adminEmail = process.env.E2E_ADMIN_EMAIL ?? "admin@bonusgo.test";
+  const adminEmail = process.env.E2E_ADMIN_EMAIL ?? "admin@qronus.test";
   // Ensure the admin account exists (registration fails harmlessly if it already does).
   await ap.goto("/register?role=customer");
   await ap.fill('input[name="email"]', adminEmail);

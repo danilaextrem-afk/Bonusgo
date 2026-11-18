@@ -13,7 +13,7 @@ export function CustomerShell({ children, logoutAction }: { children: ReactNode;
     <div className="min-h-dvh">
       <header className="border-b border-line bg-surface">
         <div className="container-x flex items-center justify-between gap-3 py-3">
-          <Link href="/me" className="text-lg font-extrabold tracking-tight">BONUS<span className="glow-text">GO</span></Link>
+          <Link href="/me" className="text-lg font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
           <nav aria-label="Меню клиента" className="flex items-center gap-1 text-sm">
             {LINKS.map((l) => (
               <Link key={l.href} href={l.href} className="rounded-xl px-3 py-2 text-muted hover:bg-surface-2 hover:text-text">{l.label}</Link>

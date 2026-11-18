@@ -11,7 +11,7 @@ export function PartnerForm({ email }: { email: string }) {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const body = [`Имя: ${name}`, `Контакт: ${contact}`, `Кто вы: ${kind}`, "", message].join("\n");
-    const href = `mailto:${email}?subject=${encodeURIComponent("Партнёрство BONUSGO")}&body=${encodeURIComponent(body.slice(0, 1500))}`;
+    const href = `mailto:${email}?subject=${encodeURIComponent("Партнёрство QRonus")}&body=${encodeURIComponent(body.slice(0, 1500))}`;
     setSent(true);
     window.location.href = href;
   };
