@@ -10,6 +10,31 @@ type Claim = Awaited<ReturnType<typeof listSbpClaims>>[number];
 
 export function SbpClaims({ claims }: { claims: Claim[] }) {
   if (claims.length === 0) return <p className="card text-sm text-muted">Заявок на оплату по СБП пока нет.</p>;
+  const pending = claims.filter((c) => c.payment.status === "PENDING");
+  // Processed claims that still need a manual receipt stay visible; the rest collapse.
+  const needsReceipt = claims.filter((c) => c.payment.status === "PAID" && !c.payment.npdReceiptId);
+  const rest = claims.filter((c) => c.payment.status !== "PENDING" && !(c.payment.status === "PAID" && !c.payment.npdReceiptId));
+  return (
+    <div className="space-y-3">
+      {pending.length === 0 && <p className="card text-sm text-muted">Новых заявок нет.</p>}
+      <ClaimList claims={pending} />
+      {needsReceipt.length > 0 && (
+        <details className="card">
+          <summary className="cursor-pointer text-sm font-semibold text-warn">Без чека: {needsReceipt.length}</summary>
+          <div className="mt-3"><ClaimList claims={needsReceipt} /></div>
+        </details>
+      )}
+      {rest.length > 0 && (
+        <details className="card">
+          <summary className="cursor-pointer text-sm text-muted">Обработанные: {rest.length}</summary>
+          <div className="mt-3"><ClaimList claims={rest} /></div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function ClaimList({ claims }: { claims: Claim[] }) {
   return (
     <div className="space-y-3">
       {claims.map(({ payment: p, companyName }) => (

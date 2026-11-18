@@ -1,65 +1,24 @@
 import type { Metadata } from "next";
 import { desc, eq, ilike, or } from "drizzle-orm";
 import { Notice, formatDate } from "@/components/app/ui";
-import { pick, rec, type Rec } from "@/components/app/adapt";
-import { formatMoney, type CurrencyCode } from "@/lib/plans";
+import { formatMoney } from "@/lib/plans";
 import { db, schema } from "@/server/db";
 import { requirePlatformAdmin } from "@/server/auth/session";
 import { getPlatformStats } from "@/server/loyalty/service";
 import { getPaymentDiagnostics } from "@/server/payments/service";
 import { listSbpClaims } from "@/server/payments/sbp";
 import { SbpClaims } from "@/components/app/SbpClaims";
+import { FunnelBars, Flag, MarketTabs, MrrTile, StatTile, type Market } from "@/components/admin/AdminParts";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Админ-панель", robots: { index: false, follow: false } };
 
-const LABELS: Record<string, string> = {
-  users: "Пользователи", customers: "Клиенты", businesses: "Бизнесы", companies: "Компании", venues: "Заведения", programs: "Программы",
-  cards: "Карты", transactions: "Операции", activeCompanies: "Активные компании", paidCompanies: "Платящие компании", payingCompanies: "Платящие компании",
-  payments: "Оплаты", signups: "Регистрации", newUsers: "Новые пользователи", newCompanies: "Новые компании", accruals: "Начисления", redemptions: "Списания",
-  proCompanies: "PRO", topCompanies: "TOP", freeCompanies: "FREE", pageViews: "Просмотры страниц", referralClicks: "Клики по рефералкам",
-};
-const MONEY_KEYS = new Set(["revenue", "revenueMinor", "mrr", "mrrMinor", "money", "moneyMinor", "paidMinor", "paid", "income"]);
+const STATUS_RU: Record<string, string> = { PENDING: "Ожидает", PAID: "Оплачен", FAILED: "Неуспешно", REFUNDED: "Возврат", CANCELED: "Отменён", CANCELLED: "Отменён" };
 
-function Money({ value }: { value: unknown }) {
-  const m = rec(value);
-  const cells = (["RUB", "BYN"] as CurrencyCode[]).filter((c) => m[c] !== undefined);
-  if (cells.length === 0) return <>—</>;
-  return (
-    <span className="space-x-3">
-      {cells.map((c) => <span key={c}>{formatMoney(Number(m[c]) || 0, c)}</span>)}
-    </span>
-  );
-}
-
-function Block({ title, data }: { title: string; data: unknown }) {
-  const r: Rec = rec(data);
-  const entries = Object.entries(r);
-  return (
-    <div className="card">
-      <h2 className="mb-3 font-semibold">{title}</h2>
-      {entries.length === 0 ? (
-        <p className="text-sm text-muted">Нет данных</p>
-      ) : (
-        <dl className="space-y-2 text-sm">
-          {entries.map(([k, v]) => {
-            const isMoney = MONEY_KEYS.has(k) || (typeof v === "object" && v !== null && ("RUB" in v || "BYN" in v));
-            if (!isMoney && typeof v === "object") return null;
-            return (
-              <div key={k} className="flex justify-between gap-3">
-                <dt className="text-muted">{LABELS[k] ?? k}</dt>
-                <dd className="text-right font-semibold">{isMoney ? <Money value={v} /> : String(v)}</dd>
-              </div>
-            );
-          })}
-        </dl>
-      )}
-    </div>
-  );
-}
-
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ market?: string }> }) {
   await requirePlatformAdmin();
+  const sp = await searchParams;
+  const market: Market = sp.market === "RU" || sp.market === "BY" ? sp.market : "ALL";
   const [stats, diag, errors, failed, claims] = await Promise.all([
     getPlatformStats(),
     getPaymentDiagnostics(),
@@ -74,48 +33,160 @@ export default async function AdminPage() {
   ]);
   const pending = claims.filter((c) => c.payment.status === "PENDING").length;
   const notes = (process.env.FREE_TIER_NOTES ?? "").split(/\r?\n|\|/).map((s) => s.trim()).filter(Boolean);
+  const b = market === "RU" ? stats.RU : market === "BY" ? stats.BY : stats.total;
+  const f = stats.funnel;
+  const c = stats.conversion;
+  const funnelRows = [
+    { label: "Просмотры страниц", value: f.page_view },
+    { label: "Органические визиты", value: f.organic_visits },
+    { label: "Регистрации бизнеса", value: f.signup_business },
+    { label: "Первая карта", value: f.first_card },
+    { label: "Заведение активировано", value: f.venue_activated },
+    { label: "Оплата", value: f.paid },
+    { label: "Клики по рефералкам", value: f.referral_click },
+  ];
+  const conv = [
+    { label: "Визит → регистрация", v: c.visitToSignup },
+    { label: "Регистрация → 1-я карта", v: c.signupToFirstCard },
+    { label: "1-я карта → активация", v: c.firstCardToActivated },
+    { label: "Регистрация → оплата", v: c.signupToPaid },
+  ];
+  const errCount = failed.length + errors.length;
+  const statusEntries = Object.entries(diag.countsByStatus);
 
   return (
-    <main className="container-x py-8">
+    <main className="container-x overflow-x-hidden py-6">
       <h1 className="mb-1 text-2xl font-bold">Админ-панель</h1>
-      <p className="mb-6 text-sm text-muted">Валюты RUB и BYN показаны раздельно и никогда не суммируются.</p>
+      <p className="mb-5 text-sm text-muted">Валюты RUB и BYN показаны раздельно и никогда не суммируются.</p>
 
-      <h2 className="mb-3 font-semibold">Оплаты по СБП {pending > 0 && <span className="badge ml-2">ждут: {pending}</span>}</h2>
-      <p className="mb-3 text-sm text-muted">Проверьте поступление в приложении Т-Банка по сумме и коду в комментарии, затем подтвердите.</p>
-      <div className="mb-8"><SbpClaims claims={claims} /></div>
+      <section className="mb-8">
+        <h2 className="mb-2 flex flex-wrap items-center gap-2 font-semibold">Оплаты по СБП {pending > 0 && <span className="badge">ждут: {pending}</span>}</h2>
+        <p className="mb-3 text-sm text-muted">Проверьте поступление в приложении Т-Банка по сумме и коду в комментарии, затем подтвердите.</p>
+        <div className="min-w-0 max-w-full overflow-x-auto"><SbpClaims claims={claims} /></div>
+      </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Block title="Россия" data={pick(stats, "RU", "ru", "russia")} />
-        <Block title="Беларусь" data={pick(stats, "BY", "by", "belarus")} />
-        <Block title="Всего" data={pick(stats, "total", "totals", "all")} />
-      </div>
+      <section className="mb-8">
+        <h2 className="mb-3 font-semibold">Статистика</h2>
+        <MarketTabs active={market} />
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <StatTile label="Компании" value={b.companies} />
+          <StatTile label="Заведения" value={b.venues} />
+          <StatTile label="Программы" value={b.programs} />
+          <StatTile label="Карты" value={b.cards} />
+          <StatTile label="Регистрации 7 дн." value={b.signups7d} />
+          <StatTile label="Регистрации 30 дн." value={b.signups30d} />
+          <StatTile label="Платящие компании" value={b.paidCompanies} />
+          <StatTile label="Сбои оплат 30 дн." value={b.paymentFailures30d} />
+          <MrrTile mrr={b.mrr} market={market} />
+        </div>
+      </section>
 
-      <h2 className="mb-3 mt-8 font-semibold">Диагностика платежей</h2>
-      <pre className="card overflow-x-auto text-xs">{JSON.stringify(diag, null, 2)}</pre>
+      <section className="mb-8">
+        <h2 className="mb-3 font-semibold">Воронка (30 дней)</h2>
+        <div className="card">
+          <FunnelBars rows={funnelRows} />
+          <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-line pt-3 text-sm">
+            {conv.map((x) => (
+              <div key={x.label} className="min-w-0">
+                <dt className="text-xs text-muted">{x.label}</dt>
+                <dd className="font-semibold text-neon">{x.v}%</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
 
-      <h2 className="mb-3 mt-8 font-semibold">Последние ошибки</h2>
-      <div className="card divide-y divide-line !p-0 text-sm">
-        {failed.length === 0 && errors.length === 0 && <p className="p-4 text-muted">Ошибок нет.</p>}
-        {failed.map((p) => (
-          <div key={p.id} className="px-4 py-3">
-            <div className="font-medium">Неуспешная оплата #{p.invoiceNo} · {p.provider} · {p.plan}</div>
-            <div className="text-xs text-muted">{formatDate(p.createdAt)} · {formatMoney(p.amountMinor, p.currency)} · {p.failReason ?? "причина не указана"}</div>
+      <section className="mb-8">
+        <h2 className="mb-3 font-semibold">Диагностика платежей</h2>
+        <div className="card space-y-4 text-sm">
+          <table className="w-full table-fixed">
+            <thead>
+              <tr className="text-left text-xs text-muted">
+                <th className="w-[30%] pb-2 font-normal">Страна</th>
+                <th className="w-[22%] pb-2 font-normal">Провайдер</th>
+                <th className="pb-2 font-normal">Флаги</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {(["RU", "BY"] as const).map((k) => {
+                const d = diag.countries[k];
+                return (
+                  <tr key={k} className="align-top">
+                    <td className="py-2 font-semibold">{k === "RU" ? "Россия" : "Беларусь"}</td>
+                    <td className="break-words py-2">{d.provider}</td>
+                    <td className="py-2">
+                      <div className="flex flex-wrap gap-1">
+                        <Flag on={d.configured} onLabel="настроен" offLabel="не настроен" />
+                        <Flag on={d.live} onLabel="live" offLabel="не live" />
+                        <Flag on={d.testMode} onLabel="тест" offLabel="не тест" />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div>
+            <div className="mb-2 text-xs text-muted">Платежи по статусам</div>
+            {statusEntries.length === 0 ? (
+              <p className="text-muted">Платежей пока нет.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {statusEntries.map(([k, n]) => <span key={k} className="badge">{STATUS_RU[k] ?? k}: {n}</span>)}
+              </div>
+            )}
           </div>
-        ))}
-        {errors.map((e) => (
-          <div key={e.id} className="px-4 py-3">
-            <div className="font-medium">{e.action}</div>
-            <div className="break-all text-xs text-muted">{formatDate(e.createdAt)}{e.companyId ? ` · компания ${e.companyId}` : ""}{e.meta ? ` · ${JSON.stringify(e.meta).slice(0, 200)}` : ""}</div>
+          <div className="flex justify-between gap-3 border-t border-line pt-3">
+            <span className="text-muted">Сбои за 30 дней</span>
+            <span className={`font-semibold ${diag.failures30d > 0 ? "text-danger" : ""}`}>{diag.failures30d}</span>
           </div>
-        ))}
-      </div>
+          <details>
+            <summary className="cursor-pointer font-medium">Последние события ({diag.lastEvents.length})</summary>
+            {diag.lastEvents.length === 0 ? (
+              <p className="mt-2 text-muted">Событий нет.</p>
+            ) : (
+              <ul className="mt-2 divide-y divide-line">
+                {diag.lastEvents.map((e) => (
+                  <li key={e.id} className="py-2">
+                    <div className="break-all font-medium">{e.provider} · {e.kind}</div>
+                    <div className="break-all text-xs text-muted">{formatDate(e.receivedAt)} · {e.verified ? "подпись проверена" : "не проверено"} · {e.eventKey}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </details>
+        </div>
+      </section>
 
-      <h2 className="mb-3 mt-8 font-semibold">Инфраструктура и бесплатные лимиты</h2>
-      {notes.length > 0 ? (
-        <ul className="card list-disc space-y-1 pl-9 text-sm">{notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
-      ) : (
-        <Notice>Переменная FREE_TIER_NOTES не задана. Добавьте заметки о лимитах бесплатных тарифов хостинга и БД (разделитель — перенос строки или «|»).</Notice>
-      )}
+      <section className="mb-8">
+        <details className="card !p-0">
+          <summary className="cursor-pointer px-4 py-3 font-semibold">Последние ошибки ({errCount})</summary>
+          <div className="divide-y divide-line border-t border-line text-sm">
+            {errCount === 0 && <p className="p-4 text-muted">Ошибок нет.</p>}
+            {failed.map((p) => (
+              <div key={p.id} className="px-4 py-3">
+                <div className="font-medium">Неуспешная оплата #{p.invoiceNo} · {p.provider} · {p.plan}</div>
+                <div className="break-words text-xs text-muted">{formatDate(p.createdAt)} · {formatMoney(p.amountMinor, p.currency)} · {p.failReason ?? "причина не указана"}</div>
+              </div>
+            ))}
+            {errors.map((e) => (
+              <div key={e.id} className="px-4 py-3">
+                <div className="break-all font-medium">{e.action}</div>
+                <div className="break-all text-xs text-muted">{formatDate(e.createdAt)}{e.companyId ? ` · компания ${e.companyId}` : ""}{e.meta ? ` · ${JSON.stringify(e.meta).slice(0, 200)}` : ""}</div>
+              </div>
+            ))}
+          </div>
+        </details>
+      </section>
+
+      <section>
+        <h2 className="mb-3 font-semibold">Инфраструктура и бесплатные лимиты</h2>
+        {notes.length > 0 ? (
+          <ul className="card list-disc space-y-1 pl-9 text-sm">{notes.map((n, i) => <li key={i} className="break-words">{n}</li>)}</ul>
+        ) : (
+          <Notice>Переменная FREE_TIER_NOTES не задана. Добавьте заметки о лимитах бесплатных тарифов хостинга и БД (разделитель — перенос строки или «|»).</Notice>
+        )}
+      </section>
     </main>
   );
 }

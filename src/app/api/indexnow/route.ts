@@ -1,7 +1,6 @@
 import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
-import sitemap from "@/app/sitemap";
-import { SITE_URL } from "@/lib/seo";
+import { submitSitemapToIndexNow } from "@/server/indexnow";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,16 +19,6 @@ export async function POST(req: Request) {
   const given = req.headers.get("x-cron-secret") ?? "";
   if (!safeEqual(given, secret)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
-  const urlList = sitemap().map((e) => e.url).slice(0, 10000);
-  const host = new URL(SITE_URL).host;
-  try {
-    const res = await fetch("https://yandex.com/indexnow", {
-      method: "POST",
-      headers: { "content-type": "application/json; charset=utf-8" },
-      body: JSON.stringify({ host, key, keyLocation: `${SITE_URL}/${key}.txt`, urlList }),
-    });
-    return NextResponse.json({ ok: res.ok, status: res.status, submitted: urlList.length }, { status: res.ok ? 200 : 502 });
-  } catch {
-    return NextResponse.json({ ok: false, error: "upstream_failed" }, { status: 502 });
-  }
+  const r = await submitSitemapToIndexNow();
+  return NextResponse.json(r, { status: r.ok ? 200 : 502 });
 }
