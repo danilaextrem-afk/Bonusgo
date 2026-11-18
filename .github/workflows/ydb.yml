@@ -1,7 +1,7 @@
 name: YDB
 on:
   push:
-    branches: [main, ydb]
+    branches: [main, "ydb*"]
   pull_request:
 jobs:
   ydb-tests:
