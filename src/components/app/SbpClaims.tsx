@@ -19,7 +19,7 @@ export function SbpClaims({ claims }: { claims: Claim[] }) {
       {pending.length === 0 && <p className="card text-sm text-muted">Новых заявок нет.</p>}
       <ClaimList claims={pending} />
       {needsReceipt.length > 0 && (
-        <details className="card">
+        <details className="card" open>
           <summary className="cursor-pointer text-sm font-semibold text-warn">Без чека: {needsReceipt.length}</summary>
           <div className="mt-3"><ClaimList claims={needsReceipt} /></div>
         </details>

@@ -4,7 +4,7 @@ import { test, expect, type Page } from "@playwright/test";
 test.skip(!process.env.SBP_PHONE, "SBP_PHONE not set for this run");
 
 const PASSWORD = "Passw0rd!test";
-async function register(page: Page, email: string) {
+async function register(page: Page, email: string, company: string) {
   await page.goto(`/register?role=business&country=RU`);
   await page.fill('input[name="name"]', "Owner");
   await page.fill('input[name="email"]', email);
@@ -14,8 +14,9 @@ async function register(page: Page, email: string) {
   await page.locator('main form button[type="submit"]').last().click();
   await page.waitForURL(/\/app/);
   await page.goto("/app/onboarding");
-  await page.fill('input[name="name"]', "Барбершоп СБП");
+  await page.fill('input[name="name"]', company);
   await page.locator('main form button[type="submit"]').last().click();
+  await expect(page.getByText("Шаг 2 из 4")).toBeVisible(); // company exists before we leave onboarding
 }
 
 test("SBP: pay → instant grace → admin confirms", async ({ browser }, info) => {
@@ -23,7 +24,8 @@ test("SBP: pay → instant grace → admin confirms", async ({ browser }, info) 
   const biz = await browser.newContext({ ...info.project.use, extraHTTPHeaders: { "x-forwarded-for": ip() } } as never);
   const adm = await browser.newContext({ ...info.project.use, extraHTTPHeaders: { "x-forwarded-for": ip() } } as never);
   const bp = await biz.newPage();
-  await register(bp, `sbp-${Date.now()}-${info.project.name}@example.test`);
+  const company = `Барбершоп ${Date.now()}-${info.project.name}`;
+  await register(bp, `sbp-${Date.now()}-${info.project.name}@example.test`, company);
 
   await bp.goto("/app/billing");
   await bp.locator("form").filter({ hasText: "Перейти на PRO" }).getByRole("button", { name: "Перейти на PRO" }).click();
@@ -56,9 +58,11 @@ test("SBP: pay → instant grace → admin confirms", async ({ browser }, info) 
     await ap.waitForURL(/\/(app|me)/);
   }
   await ap.goto("/admin");
-  const card = ap.locator(".card").filter({ hasText: "Барбершоп СБП" }).filter({ hasText: "PRO" }).first();
-  await card.getByRole("button", { name: "Подтвердить" }).click();
-  await expect(ap.getByText(/Подтверждено/).first()).toBeVisible();
+  const pendingCard = ap.locator(".card").filter({ hasText: company }).filter({ has: ap.getByRole("button", { name: "Подтвердить" }) }).last();
+  await pendingCard.getByRole("button", { name: "Подтвердить" }).click();
+  // Confirmed claim leaves the pending list and shows up under "Без чека" (receipts not configured in tests).
+  await expect(ap.locator(".card").filter({ hasText: company }).getByRole("button", { name: "Подтвердить" })).toHaveCount(0);
+  await expect(ap.getByText(/Без чека/)).toBeVisible();
 
   await bp.goto("/app/billing");
   await expect(bp.getByText("оплачено").first()).toBeVisible();
