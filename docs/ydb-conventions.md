@@ -7,7 +7,8 @@ Goal: replace every `db`/Drizzle query with YQL via `@ydbjs/query`, keeping **ex
 import { ydb } from "@/server/ydb/client";
 import { optText, optInt, optBool, optDate, optJson, json, nowSec, num } from "@/server/ydb/values";
 const sql = await ydb();
-const [rows] = await sql<[Row[]]>`SELECT ... WHERE id = ${id}`;       // first result set
+const [rows] = await sql<[Row]>`SELECT ... WHERE id = ${id}`;         // generic = row type per result set
+const [[row]] = await sql<[Row]>`SELECT ... LIMIT 1`;                 // single row
 await sql.begin(async (tx) => { await tx`...`; });                   // serializable, auto-retried on conflicts
 ```
 - Parameters: string, integer number (Int32), boolean, Date (Datetime) bind directly. **Never pass `null`/`undefined`** — use `optText/optInt/optBool/optDate/optJson`. Use `json(v)` for non-null JsonDocument.
@@ -19,7 +20,9 @@ await sql.begin(async (tx) => { await tx`...`; });                   // serializ
 ## Transactions & concurrency
 - `sql.begin` is SERIALIZABLE with optimistic locks; conflicting transactions are aborted and **the whole callback is retried** — so callbacks must be side-effect free outside the DB (no audit/notify/fetch inside; do them after commit).
 - This replaces `SELECT ... FOR UPDATE` and `pg_advisory_xact_lock`: read the rows you depend on inside the tx; a concurrent change aborts one tx.
-- Throwing an app error inside `begin` rolls back and is not retried (only YDB retryable errors are).
+- Throwing an app error inside `begin` rolls back and is not retried, BUT the SDK wraps it as `Error("Transaction failed.", { cause })`: always `catch (e) { throw unwrapTx(e) }` (from `src/server/ydb/errors.ts`) or use `inTx(sql, fn)`.
+- `LIMIT` needs a literal: `LIMIT ${sql.unsafe(String(n))}` with an integer from code (never user input).
+- `withLimitLock(companyId, resource, fn)` (limits.ts) is a serializable tx wrapper; `assert*` limit functions accept the tx as last arg.
 
 ## Uniqueness (no unique indexes)
 Lookup tables whose primary key is the unique value; `INSERT INTO` fails on duplicates (UPSERT does not):

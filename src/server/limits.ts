@@ -1,3 +1,4 @@
+import { unwrapTx } from "@/server/ydb/errors";
 import "server-only";
 import type { SQL, TX } from "@ydbjs/query";
 import type { db } from "@/server/db";
@@ -11,7 +12,6 @@ import { ACTIVE_CUSTOMER_DAYS, PLAN_LIMITS, type PlanId, type PlanLimits } from 
 type Q = SQL;
 type Row = Record<string, unknown>;
 /** `sql.begin` wraps non-retryable errors (incl. our AppErrors) as Error("Transaction failed.", { cause }): unwrap. */
-const unwrapTx = (e: unknown): unknown => (e instanceof Error && e.message === "Transaction failed." && e.cause !== undefined ? e.cause : e);
 const conn = async (q?: Q): Promise<Q> => q ?? (await ydb());
 
 /** Paid plan whose period has ended falls back to FREE. A paid plan with no expiry is treated as active. */
