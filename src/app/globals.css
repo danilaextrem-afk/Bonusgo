@@ -1,26 +1,35 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* BONUSGO design tokens: graphite + neon green */
+@theme {
+  --color-bg: #0b0d0e;
+  --color-surface: #131618;
+  --color-surface-2: #1a1e21;
+  --color-line: #262b2f;
+  --color-text: #e8ecee;
+  --color-muted: #9aa4ab;
+  --color-neon: #39ff88;
+  --color-neon-dim: #1fcf66;
+  --color-danger: #ff5c5c;
+  --color-warn: #ffc24b;
+  --font-sans: "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius-card: 18px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+html { color-scheme: dark; }
+body { background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+:focus-visible { outline: 2px solid var(--color-neon); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .container-x { @apply mx-auto w-full max-w-6xl px-4 sm:px-6; }
+  .card { @apply rounded-[18px] border border-line bg-surface p-5; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none; }
+  .btn-primary { @apply btn bg-neon text-black hover:bg-neon-dim shadow-[0_0_24px_rgba(57,255,136,0.25)]; }
+  .btn-ghost { @apply btn border border-line text-text hover:border-neon/60 hover:text-neon; }
+  .input { @apply w-full rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm text-text placeholder:text-muted focus:border-neon focus:outline-none; }
+  .label { @apply mb-1 block text-xs font-medium uppercase tracking-wide text-muted; }
+  .badge { @apply inline-flex items-center rounded-full border border-neon/40 bg-neon/10 px-2.5 py-0.5 text-xs font-medium text-neon; }
+  .glow-text { @apply text-neon drop-shadow-[0_0_18px_rgba(57,255,136,0.45)]; }
 }
