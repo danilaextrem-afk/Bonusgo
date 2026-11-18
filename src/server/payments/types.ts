@@ -44,6 +44,11 @@ export class PaymentError extends Error {
 }
 
 export const testModeOn = () => process.env.PAYMENTS_TEST_MODE === "true";
+/**
+ * Test payments (mock provider, provider sandboxes) may grant plans only outside production,
+ * or on an explicitly marked staging/CI server. A live site can never be upgraded by a test payment.
+ */
+export const testPaymentsMayActivate = () => process.env.NODE_ENV !== "production" || process.env.ALLOW_TEST_PAYMENTS === "true";
 export const appUrl = (path = "") => (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "") + path;
 
 /** "990.00" -> 99000. Strict decimal parse, no floats. Returns NaN on garbage. */

@@ -4,9 +4,10 @@ import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNull, like, or, s
 import { db, schema } from "@/server/db";
 import { AppError, ForbiddenError, LimitError, NotFoundError } from "@/server/errors";
 import { audit } from "@/server/audit";
+import { notifyOwner } from "@/server/notify";
 import { rateLimit } from "@/server/security/rateLimit";
 import { trackEvent } from "./analytics";
-import { assertCanAddProgram, assertCanAddStaff, assertCanAddVenue, assertFeature, effectivePlan } from "@/server/limits";
+import { assertCanAddProgram, assertCanAddStaff, assertCanAddVenue, assertFeature, assertOperationAllowed, brandingAllowed, effectivePlan, withLimitLock } from "@/server/limits";
 import { ACTIVE_CUSTOMER_DAYS, COUNTRY, PLAN_LIMITS, PLAN_PRICES, type CountryCode } from "@/lib/plans";
 import { MAX_PURCHASE_MINOR, computePoints, csvRow, isValidColor, isValidLogoUrl, maskEmail, parseCustomerToken, slugify } from "./utils";
 
@@ -79,6 +80,7 @@ export async function createCompany(
     if (referrer) await tx.insert(schema.referrals).values({ referrerCompanyId: referrer.id, referredCompanyId: c.id });
     return c;
   });
+  void notifyOwner(`🆕 Новый бизнес: ${company.name} (${COUNTRY[company.country].name})`);
   await audit("company.create", { actorUserId: userId, companyId: company.id, meta: { country: company.country, referred: !!company.referredById } });
   await trackEvent("signup_business", { country: company.country, companyId: company.id, source: company.referredById ? "referral" : undefined });
   return company;
@@ -90,22 +92,24 @@ export async function createVenue(companyId: string, i: { name: string; address?
   if (i.brandColor && !isValidColor(i.brandColor)) throw new AppError("VALIDATION", "Цвет должен быть в формате #RRGGBB.");
   if (i.logoUrl && !isValidLogoUrl(i.logoUrl)) throw new AppError("VALIDATION", "Логотип: https-ссылка или PNG/JPEG/WebP до 200 КБ.");
   await getCompany(companyId);
-  await assertCanAddVenue(companyId);
-  const base = slugify(name);
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const slug = `${base}-${randomBytes(3).toString("hex")}`;
-    try {
-      const [v] = await db
-        .insert(schema.venues)
-        .values({ companyId, name, address: address ?? null, slug, brandColor: i.brandColor ?? "#39FF88", logoUrl: i.logoUrl ?? null })
-        .returning();
-      await audit("venue.create", { companyId, meta: { venueId: v.id } });
-      return v;
-    } catch (e) {
-      if (!isUniqueViolation(e)) throw e;
+  const v = await withLimitLock(companyId, "venue", async (tx) => {
+    await assertCanAddVenue(companyId, tx);
+    const base = slugify(name);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const slug = `${base}-${randomBytes(3).toString("hex")}`;
+      try {
+        // Savepoint: a slug collision must not abort the whole locked transaction.
+        return await tx.transaction(async (sp) =>
+          (await sp.insert(schema.venues).values({ companyId, name, address: address ?? null, slug, brandColor: i.brandColor ?? "#39FF88", logoUrl: i.logoUrl ?? null }).returning())[0],
+        );
+      } catch (e) {
+        if (!isUniqueViolation(e)) throw e;
+      }
     }
-  }
-  throw new AppError("SLUG_CONFLICT", "Не удалось создать адрес страницы. Повторите попытку.");
+    throw new AppError("SLUG_CONFLICT", "Не удалось создать адрес страницы. Повторите попытку.");
+  });
+  await audit("venue.create", { companyId, meta: { venueId: v.id } });
+  return v;
 }
 
 export async function createProgram(
@@ -119,9 +123,12 @@ export async function createProgram(
   const pointsPercent = i.type === "POINTS" ? intIn(i.pointsPercent ?? 5, 1, 50, "Процент начисления — от 1 до 50.") : 5;
   const venue = (await db.select().from(schema.venues).where(and(eq(schema.venues.id, i.venueId), eq(schema.venues.companyId, companyId))).limit(1))[0];
   if (!venue) throw new NotFoundError("Заведение не найдено.");
-  await assertCanAddProgram(companyId, i.type);
-  const before = Number((await db.select({ n: count() }).from(schema.programs).where(eq(schema.programs.companyId, companyId)))[0]?.n ?? 0);
-  const [p] = await db.insert(schema.programs).values({ companyId, venueId: venue.id, type: i.type, name, stampsRequired, pointsPercent, rewardText }).returning();
+  const { p, before } = await withLimitLock(companyId, "program", async (tx) => {
+    await assertCanAddProgram(companyId, i.type, tx);
+    const before = Number((await tx.select({ n: count() }).from(schema.programs).where(eq(schema.programs.companyId, companyId)))[0]?.n ?? 0);
+    const [p] = await tx.insert(schema.programs).values({ companyId, venueId: venue.id, type: i.type, name, stampsRequired, pointsPercent, rewardText }).returning();
+    return { p, before };
+  });
   await audit("program.create", { companyId, meta: { programId: p.id, type: p.type } });
   if (before === 0) {
     const c = await getCompany(companyId);
@@ -154,9 +161,11 @@ export async function addStaff(companyId: string, i: { email: string; role: "MAN
   }
   const existing = (await db.select().from(schema.memberships).where(and(eq(schema.memberships.companyId, companyId), eq(schema.memberships.userId, user.id))).limit(1))[0];
   if (existing) throw new AppError("ALREADY_MEMBER", "Этот пользователь уже в команде.", 409);
-  await assertCanAddStaff(companyId);
   try {
-    const [m] = await db.insert(schema.memberships).values({ companyId, userId: user.id, role: i.role, venueId }).returning();
+    const m = await withLimitLock(companyId, "staff", async (tx) => {
+      await assertCanAddStaff(companyId, tx);
+      return (await tx.insert(schema.memberships).values({ companyId, userId: user.id, role: i.role, venueId }).returning())[0];
+    });
     await audit("staff.add", { companyId, meta: { userId: user.id, role: i.role } });
     return m;
   } catch (e) {
@@ -187,7 +196,8 @@ export async function getPublicProgramByVenueSlug(slug: string) {
   const removeBranding = PLAN_LIMITS[plan].removeBranding;
   const v = row.venue;
   return {
-    venue: { id: v.id, name: v.name, slug: v.slug, address: v.address, logoUrl: v.logoUrl, brandColor: v.brandColor },
+    // Custom logo/colour only while the plan includes branding (frozen after a downgrade).
+    venue: { id: v.id, name: v.name, slug: v.slug, address: v.address, logoUrl: brandingAllowed(row.company) ? v.logoUrl : null, brandColor: brandingAllowed(row.company) ? v.brandColor : "#39FF88" },
     company: { id: row.company.id, name: row.company.name, country: row.company.country, plan, removeBranding },
     plan,
     showBranding: !removeBranding,
@@ -267,6 +277,8 @@ async function prepareOp(i: OpInput) {
   if (!program) throw new NotFoundError("Программа не найдена.");
   if (!program.active) throw new AppError("PROGRAM_INACTIVE", "Программа отключена.");
   if (m.role === "STAFF" && m.venueId && m.venueId !== program.venueId) throw new ForbiddenError("Эта программа относится к другому заведению.");
+  const usesReward = Boolean((i as { rewardId?: string }).rewardId);
+  await assertOperationAllowed(company, program, m, { usesReward });
   return { key, membership: m, company, program };
 }
 

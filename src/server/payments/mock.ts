@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { PaymentError, appUrl, testModeOn, type PaymentProvider } from "./types";
+import { PaymentError, appUrl, testModeOn, testPaymentsMayActivate, type PaymentProvider } from "./types";
 
 /** Test-only provider. Its "payment page" is a signed link that goes through the same processNotification pipeline. */
-export const mockAllowed = () => !(process.env.NODE_ENV === "production" && !testModeOn());
+export const mockAllowed = () => testModeOn() && testPaymentsMayActivate();
 
 export const mockSig = (invoiceNo: number | string) =>
   createHmac("sha256", process.env.SESSION_SECRET ?? "").update(`mock:${invoiceNo}`).digest("hex");

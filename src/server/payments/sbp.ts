@@ -3,6 +3,8 @@ import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 import { audit } from "@/server/audit";
 import { db, schema } from "@/server/db";
 import { confirmReferral } from "@/server/loyalty/service";
+import { notifyOwner } from "@/server/notify";
+import { formatMoney } from "@/lib/plans";
 import { issueReceipt, npdConfigured } from "./npd";
 import { addMonths } from "./dates";
 import { PaymentError, appUrl, type PaymentProvider } from "./types";
@@ -54,6 +56,7 @@ const innRe = /^(\d{10}|\d{12})$/;
 export async function claimSbpPayment(companyId: string, paymentId: string, payer: { inn?: string; name?: string }, now = new Date()) {
   const inn = payer.inn?.trim() || undefined;
   if (inn && !innRe.test(inn)) throw new PaymentError("ИНН плательщика — 10 или 12 цифр", "bad_inn");
+  let toNotify: string | null = null;
   const result = await db.transaction(async (tx) => {
     const [p] = await tx
       .select()
@@ -84,8 +87,10 @@ export async function claimSbpPayment(companyId: string, paymentId: string, paye
       .set({ claimedAt: now, graceApplied: grace, prevPlan: company.plan, prevPlanExpiresAt: company.planExpiresAt, payerInn: inn ?? null, payerName: payer.name?.trim().slice(0, 120) || null })
       .where(eq(schema.payments.id, p.id));
     if (grace) await tx.update(schema.companies).set({ plan: p.plan, planExpiresAt: graceEnd }).where(eq(schema.companies.id, companyId));
+    toNotify = `💸 Новая оплата по СБП: ${company.name} · ${p.plan} · ${p.months} мес · ${formatMoney(p.amountMinor, p.currency)} · код ${paymentCode(p.invoiceNo)}. Проверьте перевод и подтвердите: ${appUrl("/admin")}`;
     return { claimed: true, grace, status: p.status };
   });
+  if (toNotify) void notifyOwner(toNotify);
   await audit("billing.sbp_claimed", { companyId, meta: { paymentId, grace: result.grace } });
   return result;
 }

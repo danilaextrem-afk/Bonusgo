@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db, schema } from "@/server/db";
 import { AppError, AuthError } from "@/server/errors";
 import { audit } from "@/server/audit";
-import { rateLimit } from "@/server/security/rateLimit";
+import { getClientIp, rateLimit } from "@/server/security/rateLimit";
 import { hashPassword, verifyPassword } from "./password";
 import type { User } from "./session";
 
@@ -59,7 +59,12 @@ export async function registerUser(input: {
 
 export async function loginUser(email: string, password: string): Promise<User> {
   const normalized = String(email ?? "").trim().toLowerCase().slice(0, 254);
-  const rl = await rateLimit(`login-email:${normalized}`, 10, 15 * 60);
+  // Per email+IP (stops guessing) and a much looser per-email cap (stops distributed guessing),
+  // so a stranger can't lock a real owner out just by typing wrong passwords for their email.
+  const ip = await getClientIp();
+  const perPair = await rateLimit(`login:${normalized}:${ip}`, 10, 15 * 60);
+  const perEmail = perPair.ok ? await rateLimit(`login-email:${normalized}`, 100, 15 * 60) : perPair;
+  const rl = perPair.ok ? perEmail : perPair;
   if (!rl.ok) throw new AppError("RATE_LIMITED", `Слишком много попыток входа. Повторите через ${Math.ceil(rl.retryAfter / 60)} мин.`, 429);
   const rows = await db.select().from(schema.users).where(eq(schema.users.email, normalized)).limit(1);
   const user = rows[0];

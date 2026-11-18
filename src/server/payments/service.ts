@@ -5,7 +5,7 @@ import { audit } from "@/server/audit";
 import { db, schema } from "@/server/db";
 import { confirmReferral } from "@/server/loyalty/service";
 import { PROVIDERS, providerFor } from "./registry";
-import { PaymentError, testModeOn, type ProviderId, type VerifiedNotification } from "./types";
+import { PaymentError, testModeOn, testPaymentsMayActivate, type ProviderId, type VerifiedNotification } from "./types";
 
 export type PaidPlan = "PRO" | "TOP";
 export type Months = 1 | 3 | 12;
@@ -85,6 +85,9 @@ export async function processNotification(providerId: ProviderId, parsed: Verifi
 
     if (parsed.kind === "paid") {
       if (p.status !== "PENDING") return { ok: true, status: p.status, changed: false, companyId: p.companyId };
+      if (p.testMode && !testPaymentsMayActivate()) {
+        return { ok: true, status: p.status, changed: false, companyId: p.companyId, _companyId: p.companyId, _audit: ["error.test_payment_in_production", { invoiceNo: p.invoiceNo, provider: providerId }] };
+      }
       const stack = company.plan === p.plan && company.planExpiresAt && company.planExpiresAt > now;
       const end = addMonths(stack ? company.planExpiresAt! : now, p.months);
       await tx.update(schema.payments).set({ status: "PAID", paidAt: now, providerRef: parsed.providerRef ?? p.providerRef }).where(eq(schema.payments.id, p.id));

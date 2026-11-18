@@ -80,8 +80,14 @@ export async function requireUser(): Promise<User> {
   return u;
 }
 
+/**
+ * Admin access comes only from the database role. Emails are not verified, so an ADMIN_EMAILS
+ * allow-list would let anyone who registers that address first become admin.
+ * ADMIN_EMAILS is honoured only outside production (tests, local dev).
+ */
 export function isPlatformAdmin(u: Pick<User, "platformRole" | "email">): boolean {
   if (u.platformRole === "ADMIN") return true;
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_TEST_PAYMENTS !== "true") return false;
   const list = (process.env.ADMIN_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   return list.includes(u.email.toLowerCase());
 }

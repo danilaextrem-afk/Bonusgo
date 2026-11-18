@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { desc, eq, inArray } from "drizzle-orm";
+import { InstallBanner } from "@/components/app/InstallBanner";
 import { CopyButton } from "@/components/app/CopyButton";
 import { StampGrid } from "@/components/app/StampGrid";
 import { Empty, PageHeader, formatDate } from "@/components/app/ui";
@@ -31,6 +32,7 @@ export default async function MePage() {
   return (
     <>
       <PageHeader title={`Привет${user.name ? `, ${user.name}` : ""}!`} subtitle="Ваши бонусные карты" actions={<Link href="/me/qr" className="btn-primary">Мой QR</Link>} />
+      <InstallBanner />
       <div className="space-y-4">
         {cards.length === 0 && <Empty>Карт пока нет. Отсканируйте QR-код в заведении, чтобы получить первую.</Empty>}
         {cards.map((c, i) => {

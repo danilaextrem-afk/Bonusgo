@@ -19,7 +19,7 @@ services:
       - key: CRON_SECRET
         generateValue: true
       - key: PAYMENTS_TEST_MODE
-        value: "true"
+        value: "false"
       - key: DEMO_MODE
         value: "true"
       - key: APP_URL
