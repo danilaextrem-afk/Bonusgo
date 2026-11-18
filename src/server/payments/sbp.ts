@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, isNotNull } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, or, sql } from "drizzle-orm";
 import { audit } from "@/server/audit";
 import { db, schema } from "@/server/db";
 import { confirmReferral } from "@/server/loyalty/service";
@@ -100,8 +100,9 @@ export async function listSbpClaims(limit = 50) {
     .select({ payment: schema.payments, companyName: schema.companies.name, companyTaxId: schema.companies.taxId, companyLegalName: schema.companies.legalName })
     .from(schema.payments)
     .innerJoin(schema.companies, eq(schema.companies.id, schema.payments.companyId))
-    .where(and(eq(schema.payments.provider, "sbp"), isNotNull(schema.payments.claimedAt)))
-    .orderBy(desc(schema.payments.claimedAt))
+    // SBP claims plus automatic (Platega) payments, so missing receipts can be retried from one place.
+    .where(or(and(eq(schema.payments.provider, "sbp"), isNotNull(schema.payments.claimedAt)), and(eq(schema.payments.provider, "platega"), eq(schema.payments.status, "PAID"))))
+    .orderBy(desc(sql`coalesce(${schema.payments.claimedAt}, ${schema.payments.paidAt})`))
     .limit(limit);
 }
 

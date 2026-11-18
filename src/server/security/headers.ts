@@ -6,7 +6,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
-  "form-action 'self' https://auth.robokassa.ru https://checkout.bepaid.by",
+  "form-action 'self' https://auth.robokassa.ru https://checkout.bepaid.by https://pay.platega.io https://app.platega.io",
 ].join("; ");
 
 export const securityHeaders: { key: string; value: string }[] = [

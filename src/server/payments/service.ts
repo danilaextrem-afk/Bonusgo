@@ -5,6 +5,7 @@ import { audit } from "@/server/audit";
 import { db, schema } from "@/server/db";
 import { confirmReferral } from "@/server/loyalty/service";
 import { PROVIDERS, providerFor } from "./registry";
+import { issueSbpReceipt as issuePaymentReceipt } from "./sbp";
 import { PaymentError, testModeOn, testPaymentsMayActivate, type ProviderId, type VerifiedNotification } from "./types";
 
 export type PaidPlan = "PRO" | "TOP";
@@ -116,6 +117,11 @@ export async function processNotification(providerId: ProviderId, parsed: Verifi
   const { _audit, _companyId, ...result } = out;
   if (_audit) await audit(_audit[0], { companyId: _companyId, meta: _audit[1] }).catch(() => {});
   if (result.ok && !result.duplicated && result.status === "PAID" && result.changed && result.companyId) {
+    // Self-employed (НПД) receipt for providers that don't fiscalize themselves. Never throws.
+    if (providerId === "platega") {
+      const [paid] = await db.select({ id: schema.payments.id }).from(schema.payments).where(eq(schema.payments.invoiceNo, parsed.invoiceNo)).limit(1);
+      if (paid) await issuePaymentReceipt(paid.id);
+    }
     try {
       await confirmReferral(result.companyId);
     } catch (e) {
