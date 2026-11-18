@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { getAppContext } from "@/components/app/data";
 import { effectivePlan } from "@/server/limits";
+import { isPlatformAdmin } from "@/server/auth/session";
 import { logoutAction } from "../auth-actions";
 import { switchCompanyAction } from "./actions";
 
@@ -20,6 +21,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       plan={plan}
       switchAction={switchCompanyAction}
       logoutAction={logoutAction}
+      isAdmin={isPlatformAdmin(user)}
     >
       {children}
     </AppShell>

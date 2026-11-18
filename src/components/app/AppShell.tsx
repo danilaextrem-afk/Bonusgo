@@ -31,6 +31,7 @@ export function AppShell({
   plan,
   switchAction,
   logoutAction,
+  isAdmin = false,
 }: {
   children: ReactNode;
   userName: string;
@@ -41,8 +42,11 @@ export function AppShell({
   plan: "FREE" | "PRO" | "TOP" | null;
   switchAction: (fd: FormData) => Promise<void>;
   logoutAction: () => Promise<void>;
+  isAdmin?: boolean;
 }) {
-  const items = role === "STAFF" ? STAFF_NAV : currentId ? ALL : [];
+  const base = role === "STAFF" ? STAFF_NAV : currentId ? ALL : [];
+  // Platform owner: admin panel link in the "Ещё" menu (never shown to businesses).
+  const items = isAdmin ? [...base, { href: "/admin", label: "Админка", icon: "⚙" } as NavItem] : base;
   const primary = items.filter((i) => PRIMARY.has(i.href));
   const more = items.filter((i) => !PRIMARY.has(i.href));
   const bottomPrimary = role === "STAFF" ? items : primary;

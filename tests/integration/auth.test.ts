@@ -69,6 +69,7 @@ describe("login & session", () => {
     await expect(loginUser("rl@x.ru", "s3cret-pass")).rejects.toMatchObject({ code: "RATE_LIMITED" });
   });
   it("platform admin gate", async () => {
+    await expect(requirePlatformAdmin()).rejects.toThrow(/NEXT_REDIRECT.*\/login\?next=%2Fadmin/);
     const u = await registerUser({ ...base, email: "boss@x.ru" });
     await createSession(u.id);
     await expect(requirePlatformAdmin()).rejects.toThrow(/NEXT_NOT_FOUND/);

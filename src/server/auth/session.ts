@@ -94,7 +94,9 @@ export function isPlatformAdmin(u: Pick<User, "platformRole" | "email">): boolea
 
 export async function requirePlatformAdmin(): Promise<User> {
   const u = await getCurrentUser();
-  if (!u || !isPlatformAdmin(u)) notFound();
+  // Logged out → sign in and come back; logged in without the role → 404 (don't reveal the page).
+  if (!u) redirect("/login?next=%2Fadmin");
+  if (!isPlatformAdmin(u)) notFound();
   return u;
 }
 
