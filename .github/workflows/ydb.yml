@@ -1,0 +1,38 @@
+name: YDB
+on:
+  push:
+    branches: [main, ydb]
+  pull_request:
+jobs:
+  ydb-tests:
+    runs-on: ubuntu-latest
+    services:
+      ydb:
+        image: ydbplatform/local-ydb:latest
+        ports: ["2136:2136", "8765:8765"]
+        env:
+          GRPC_PORT: "2136"
+          MON_PORT: "8765"
+          YDB_USE_IN_MEMORY_PDISKS: "true"
+          YDB_DEFAULT_LOG_LEVEL: NOTICE
+    env:
+      YDB_ENDPOINT: grpc://localhost:2136
+      YDB_DATABASE: /local
+      SESSION_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
+      APP_URL: http://localhost:3100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Wait for YDB
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8765/viewer/json/whoami >/dev/null 2>&1 && break
+            sleep 2
+          done
+          sleep 5
+      - run: node scripts/ydb-migrate.mjs
+      - run: npx vitest run tests/ydb

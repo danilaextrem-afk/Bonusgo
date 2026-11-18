@@ -15,6 +15,11 @@
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
+    "@ydbjs/auth": "^6.3.1",
+    "@ydbjs/auth-yandex-cloud": "^0.2.0",
+    "@ydbjs/core": "^6.3.1",
+    "@ydbjs/query": "^6.3.0",
+    "@ydbjs/value": "^6.0.8",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.4",
     "next": "15.5.29",

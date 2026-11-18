@@ -1,0 +1,88 @@
+-- QRonus schema for YDB. One statement per block; applied by scripts/ydb-migrate.mjs (idempotent).
+-- Conventions: ids are Utf8; money/counters Int32; time Datetime (UTC, second precision).
+-- Uniqueness that YDB indexes can't guarantee is enforced with lookup tables whose primary key is the unique value.
+CREATE TABLE IF NOT EXISTS users (
+  id Utf8 NOT NULL, email Utf8, password_hash Utf8, name Utf8, phone Utf8, platform_role Utf8, country Utf8,
+  invite_code Utf8, invited_by_code Utf8, created_at Datetime, deleted_at Datetime,
+  PRIMARY KEY (id)
+);
+CREATE TABLE IF NOT EXISTS users_by_email ( email Utf8 NOT NULL, user_id Utf8, PRIMARY KEY (email) );
+CREATE TABLE IF NOT EXISTS sessions (
+  id Utf8 NOT NULL, user_id Utf8, csrf_token Utf8, expires_at Datetime, ip Utf8, user_agent Utf8, created_at Datetime,
+  PRIMARY KEY (id), INDEX idx_user GLOBAL SYNC ON (user_id)
+);
+CREATE TABLE IF NOT EXISTS consents (
+  id Utf8 NOT NULL, user_id Utf8, type Utf8, version Utf8, granted_at Datetime, revoked_at Datetime,
+  PRIMARY KEY (id), INDEX idx_user GLOBAL SYNC ON (user_id)
+);
+CREATE TABLE IF NOT EXISTS companies (
+  id Utf8 NOT NULL, name Utf8, country Utf8, currency Utf8, plan Utf8, plan_expires_at Datetime, legal_name Utf8, tax_id Utf8,
+  referral_code Utf8, referred_by_id Utf8, created_at Datetime, deleted_at Datetime,
+  PRIMARY KEY (id), INDEX idx_referral GLOBAL SYNC ON (referral_code)
+);
+CREATE TABLE IF NOT EXISTS memberships (
+  company_id Utf8 NOT NULL, user_id Utf8 NOT NULL, id Utf8, role Utf8, venue_id Utf8, created_at Datetime,
+  PRIMARY KEY (company_id, user_id), INDEX idx_user GLOBAL SYNC ON (user_id), INDEX idx_id GLOBAL SYNC ON (id)
+);
+CREATE TABLE IF NOT EXISTS venues (
+  id Utf8 NOT NULL, company_id Utf8, name Utf8, slug Utf8, address Utf8, logo_url Utf8, brand_color Utf8, created_at Datetime,
+  PRIMARY KEY (id), INDEX idx_company GLOBAL SYNC ON (company_id)
+);
+CREATE TABLE IF NOT EXISTS venues_by_slug ( slug Utf8 NOT NULL, venue_id Utf8, PRIMARY KEY (slug) );
+CREATE TABLE IF NOT EXISTS programs (
+  id Utf8 NOT NULL, company_id Utf8, venue_id Utf8, type Utf8, name Utf8, stamps_required Int32, points_percent Int32,
+  reward_text Utf8, active Bool, created_at Datetime,
+  PRIMARY KEY (id), INDEX idx_company GLOBAL SYNC ON (company_id), INDEX idx_venue GLOBAL SYNC ON (venue_id)
+);
+CREATE TABLE IF NOT EXISTS rewards (
+  id Utf8 NOT NULL, company_id Utf8, program_id Utf8, title Utf8, cost Int32, active Bool, created_at Datetime,
+  PRIMARY KEY (id), INDEX idx_program GLOBAL SYNC ON (program_id)
+);
+CREATE TABLE IF NOT EXISTS cards (
+  program_id Utf8 NOT NULL, customer_id Utf8 NOT NULL, id Utf8, company_id Utf8, balance Int32, last_activity_at Datetime, created_at Datetime,
+  PRIMARY KEY (program_id, customer_id), INDEX idx_id GLOBAL SYNC ON (id), INDEX idx_company GLOBAL SYNC ON (company_id), INDEX idx_customer GLOBAL SYNC ON (customer_id)
+);
+CREATE TABLE IF NOT EXISTS customer_tokens (
+  token_hash Utf8 NOT NULL, id Utf8, user_id Utf8, expires_at Datetime, used_at Datetime, created_at Datetime,
+  PRIMARY KEY (token_hash), INDEX idx_user GLOBAL SYNC ON (user_id)
+);
+CREATE TABLE IF NOT EXISTS transactions (
+  id Utf8 NOT NULL, company_id Utf8, card_id Utf8, type Utf8, amount Int32, purchase_minor Int32, staff_user_id Utf8,
+  idempotency_key Utf8, note Utf8, created_at Datetime,
+  PRIMARY KEY (id), INDEX idx_company_created GLOBAL SYNC ON (company_id, created_at), INDEX idx_card GLOBAL SYNC ON (card_id)
+);
+CREATE TABLE IF NOT EXISTS idempotency_keys ( key Utf8 NOT NULL, company_id Utf8, transaction_id Utf8, PRIMARY KEY (key) );
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id Utf8 NOT NULL, company_id Utf8, plan Utf8, status Utf8, provider Utf8, current_period_end Datetime, cancel_at_period_end Bool,
+  created_at Datetime, updated_at Datetime,
+  PRIMARY KEY (id), INDEX idx_company GLOBAL SYNC ON (company_id)
+);
+CREATE TABLE IF NOT EXISTS payments (
+  id Utf8 NOT NULL, invoice_no Int32, company_id Utf8, provider Utf8, plan Utf8, months Int32, amount_minor Int32, currency Utf8,
+  status Utf8, test_mode Bool, provider_ref Utf8, fail_reason Utf8, created_at Datetime, paid_at Datetime, refunded_at Datetime,
+  claimed_at Datetime, grace_applied Bool, prev_plan Utf8, prev_plan_expires_at Datetime, payer_inn Utf8, payer_name Utf8,
+  npd_receipt_id Utf8, npd_error Utf8,
+  PRIMARY KEY (id), INDEX idx_invoice GLOBAL SYNC ON (invoice_no), INDEX idx_company GLOBAL SYNC ON (company_id), INDEX idx_ref GLOBAL SYNC ON (provider_ref)
+);
+CREATE TABLE IF NOT EXISTS counters ( name Utf8 NOT NULL, value Int32, PRIMARY KEY (name) );
+CREATE TABLE IF NOT EXISTS payment_events (
+  event_key Utf8 NOT NULL, id Utf8, provider Utf8, payment_id Utf8, kind Utf8, verified Bool, payload JsonDocument, received_at Datetime,
+  PRIMARY KEY (event_key)
+);
+CREATE TABLE IF NOT EXISTS referrals (
+  referred_company_id Utf8 NOT NULL, id Utf8, referrer_company_id Utf8, status Utf8, created_at Datetime, confirmed_at Datetime,
+  PRIMARY KEY (referred_company_id), INDEX idx_referrer GLOBAL SYNC ON (referrer_company_id)
+);
+CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash Utf8 NOT NULL, id Utf8, user_id Utf8, expires_at Datetime, used_at Datetime, created_at Datetime,
+  PRIMARY KEY (token_hash), INDEX idx_user GLOBAL SYNC ON (user_id)
+);
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id Utf8 NOT NULL, actor_user_id Utf8, company_id Utf8, action Utf8, meta JsonDocument, ip Utf8, created_at Datetime,
+  PRIMARY KEY (id), INDEX idx_created GLOBAL SYNC ON (created_at)
+);
+CREATE TABLE IF NOT EXISTS rate_limits ( key Utf8 NOT NULL, window_start Datetime, count Int32, PRIMARY KEY (key) );
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id Utf8 NOT NULL, type Utf8, country Utf8, path Utf8, source Utf8, company_id Utf8, created_at Datetime,
+  PRIMARY KEY (id), INDEX idx_type_created GLOBAL SYNC ON (type, created_at)
+);

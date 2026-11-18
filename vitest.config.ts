@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
 export default defineConfig({
-  test: { environment: "node", include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts"], fileParallelism: false, testTimeout: 20000, setupFiles: ["tests/setup.ts"] },
+  test: { environment: "node", include: ["tests/unit/**/*.test.ts", "tests/integration/**/*.test.ts", "tests/ydb/**/*.test.ts"], fileParallelism: false, testTimeout: 20000, setupFiles: ["tests/setup.ts"] },
   resolve: { alias: { "@": path.resolve(__dirname, "src"), "server-only": path.resolve(__dirname, "tests/server-only-stub.ts") } },
 });
