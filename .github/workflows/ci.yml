@@ -19,7 +19,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bonusgo_test
       DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/bonusgo_test
       SESSION_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
-      APP_URL: http://localhost:3000
+      APP_URL: http://localhost:3100
       PAYMENTS_TEST_MODE: "true"
       ADMIN_EMAILS: admin@bonusgo.test
       # CI server runs `next start` (production mode): explicitly allow test payments there only.

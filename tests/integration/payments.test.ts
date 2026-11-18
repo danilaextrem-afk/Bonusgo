@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/server/audit", () => ({ audit: vi.fn(async () => {}) }));
-const confirmReferral = vi.fn(async (_id: string) => {});
+const confirmReferral = vi.fn(async (id: string) => void id);
 vi.mock("@/server/loyalty/service", () => ({ confirmReferral: (id: string) => confirmReferral(id) }));
 
 import { audit } from "@/server/audit";
