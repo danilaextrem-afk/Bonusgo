@@ -84,6 +84,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
           <h2 className="text-xl font-bold glow-text">Всё готово!</h2>
           <p className="mt-2 text-sm text-muted">Покажите этот QR гостям. Они отсканируют его камерой и получат карту.</p>
           <div className="mt-4 flex justify-center"><QrImage text={`${appUrl()}/v/${venues[0].slug}`} label={`QR-код заведения ${venues[0].name}`} /></div>
+          <p data-testid="venue-url" className="mt-3 break-all text-sm text-muted">{`${appUrl()}/v/${venues[0].slug}`}</p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Link href={`/api/app/poster?venueId=${venues[0].id}&format=a4`} className="btn-ghost">Скачать плакат A4</Link>
             <Link href={`/api/app/poster?venueId=${venues[0].id}&format=png`} className="btn-ghost">Скачать PNG</Link>

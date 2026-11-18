@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { QrData } from "./qr";
 import { QrSvg } from "./QrSvg";
 
-type Payload = { qr: QrData; expiresAt: number };
+type Payload = { qr: QrData; expiresAt: number; token?: string };
 type Refresh = () => Promise<Payload | { error: string }>;
 
 const REFRESH_EVERY_MS = 4 * 60 * 1000;
@@ -51,7 +51,7 @@ export function MyQr({ initial, refresh }: { initial: Payload; refresh: Refresh 
 
   return (
     <div className="text-center">
-      <div className={`mx-auto w-full max-w-xs rounded-2xl bg-white p-2 ${expired ? "opacity-30" : ""}`}>
+      <div data-token={data.token} className={`mx-auto w-full max-w-xs rounded-2xl bg-white p-2 ${expired ? "opacity-30" : ""}`}>
         <QrSvg qr={data.qr} className="w-full" label="Ваш QR-код для начисления бонусов" />
       </div>
       <p className="mt-3 text-sm text-muted" aria-live="off">

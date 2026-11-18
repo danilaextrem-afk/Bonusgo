@@ -11,3 +11,14 @@ describe("security headers", () => {
     expect(h["Strict-Transport-Security"]).toContain("max-age=31536000");
   });
 });
+
+import { vi, describe as d2, it as i2, expect as e2 } from "vitest";
+vi.mock("next/headers", () => ({
+  headers: async () => new Map([["x-forwarded-for", "6.6.6.6, 203.0.113.7"]]),
+}));
+d2("getClientIp", () => {
+  i2("ignores spoofed leftmost X-Forwarded-For entries", async () => {
+    const { getClientIp } = await import("@/server/security/rateLimit");
+    e2(await getClientIp()).toBe("203.0.113.7");
+  });
+});

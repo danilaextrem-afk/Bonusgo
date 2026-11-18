@@ -24,8 +24,12 @@ export async function getClientIp(): Promise<string> {
   try {
     const h = await headers();
     const xff = h.get("x-forwarded-for");
-    const first = xff?.split(",")[0]?.trim();
-    if (first) return first.slice(0, 64);
+    // The leftmost entries are client-controlled and can be spoofed; the hosting proxy
+    // appends the real client IP on the right. TRUSTED_PROXY_HOPS = proxies in front of the app.
+    const parts = xff?.split(",").map((p) => p.trim()).filter(Boolean) ?? [];
+    const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS ?? 1) || 1);
+    const ip = parts[Math.max(0, parts.length - hops)];
+    if (ip) return ip.slice(0, 64);
     const real = h.get("x-real-ip")?.trim();
     if (real) return real.slice(0, 64);
   } catch {

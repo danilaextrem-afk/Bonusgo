@@ -14,7 +14,7 @@ export default async function MyQrPage() {
     <>
       <PageHeader title="Мой QR" subtitle="Один код для всех ваших карт" />
       <div className="card">
-        <MyQr initial={{ qr: qrData(`BG1.${token}`), expiresAt: new Date(expiresAt).getTime() }} refresh={refreshQrAction} />
+        <MyQr initial={{ qr: qrData(`BG1.${token}`), expiresAt: new Date(expiresAt).getTime(), ...(process.env.PAYMENTS_TEST_MODE === "true" ? { token: `BG1.${token}` } : {}) }} refresh={refreshQrAction} />
       </div>
     </>
   );
