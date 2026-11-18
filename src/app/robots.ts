@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo";
 
-const PRIVATE = ["/app", "/me", "/admin", "/api", "/login", "/register", "/v/", "/scan", "/*?*"];
+const PRIVATE = ["/app", "/me", "/admin", "/api", "/login", "/register", "/reset", "/v/", "/scan", "/*?*"];
 // AI search and assistant crawlers are explicitly welcome on public pages (same private areas blocked).
 const AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "PerplexityBot", "Google-Extended", "YandexAdditional", "YandexAdditionalBot"];
 

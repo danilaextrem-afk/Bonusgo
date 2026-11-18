@@ -26,7 +26,7 @@ export const nextNavigationMock = {
 };
 
 export async function resetDb() {
-  await db.execute(sql`TRUNCATE users, sessions, consents, companies, memberships, venues, programs, rewards, cards, customer_tokens, transactions,
+  await db.execute(sql`TRUNCATE users, sessions, consents, password_resets, companies, memberships, venues, programs, rewards, cards, customer_tokens, transactions,
     subscriptions, payments, payment_events, referrals, audit_logs, rate_limits, analytics_events RESTART IDENTITY CASCADE`);
   reqState.cookies.clear();
   reqState.headers.clear();
