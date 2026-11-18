@@ -1,32 +1,39 @@
 import "server-only";
-import { and, asc, eq, isNull } from "drizzle-orm";
-import { db, schema } from "@/server/db";
 import { ForbiddenError } from "@/server/errors";
 import { requireUser, type User } from "@/server/auth/session";
+import { ydb } from "@/server/ydb/client";
+import { camel, camelAll, type Company, type Membership } from "@/server/ydb/rows";
 
-type Company = typeof schema.companies.$inferSelect;
-type Membership = typeof schema.memberships.$inferSelect;
 export type Role = Membership["role"];
 
+type Row = Record<string, unknown>;
+
+async function activeCompany(id: string): Promise<Company | null> {
+  const sql = await ydb();
+  const [[c]] = await sql<[Row]>`SELECT * FROM companies WHERE id = ${id} AND deleted_at IS NULL`;
+  return c ? camel<Company>(c) : null;
+}
+
 export async function getUserCompanies(userId: string): Promise<{ company: Company; role: Role; membership: Membership }[]> {
-  const rows = await db
-    .select({ company: schema.companies, membership: schema.memberships })
-    .from(schema.memberships)
-    .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
-    .where(and(eq(schema.memberships.userId, userId), isNull(schema.companies.deletedAt)))
-    .orderBy(asc(schema.memberships.createdAt));
-  return rows.map((r) => ({ company: r.company, role: r.membership.role, membership: r.membership }));
+  const sql = await ydb();
+  const [rows] = await sql<[Row]>`SELECT * FROM memberships VIEW idx_user WHERE user_id = ${userId} ORDER BY created_at, id`;
+  const memberships = camelAll<Membership>(rows);
+  const companies = await Promise.all(memberships.map((m) => activeCompany(m.companyId)));
+  const out: { company: Company; role: Role; membership: Membership }[] = [];
+  memberships.forEach((membership, i) => {
+    const company = companies[i];
+    if (company) out.push({ company, role: membership.role, membership });
+  });
+  return out;
 }
 
 /** Membership of a specific user (no session lookup). */
 export async function getMembership(userId: string, companyId: string): Promise<{ company: Company; membership: Membership } | null> {
-  const rows = await db
-    .select({ company: schema.companies, membership: schema.memberships })
-    .from(schema.memberships)
-    .innerJoin(schema.companies, eq(schema.companies.id, schema.memberships.companyId))
-    .where(and(eq(schema.memberships.userId, userId), eq(schema.memberships.companyId, companyId), isNull(schema.companies.deletedAt)))
-    .limit(1);
-  return rows[0] ?? null;
+  const sql = await ydb();
+  const [[m]] = await sql<[Row]>`SELECT * FROM memberships WHERE company_id = ${companyId} AND user_id = ${userId}`;
+  if (!m) return null;
+  const company = await activeCompany(companyId);
+  return company ? { company, membership: camel<Membership>(m) } : null;
 }
 
 export async function requireMembership(companyId: string, roles?: string[]): Promise<{ user: User; company: Company; membership: Membership }> {

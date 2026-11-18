@@ -1,7 +1,7 @@
 import "server-only";
-import { and, eq, isNotNull, lt, sql } from "drizzle-orm";
 import { audit } from "@/server/audit";
-import { db, schema } from "@/server/db";
+import { ydb } from "@/server/ydb/client";
+import { num } from "@/server/ydb/values";
 import { submitSitemapToIndexNow } from "@/server/indexnow";
 import { notifyOwner } from "@/server/notify";
 import { expireSubscriptions } from "@/server/payments/service";
@@ -26,12 +26,13 @@ const JOBS: { name: string; everySec: number; run: () => Promise<unknown>; enabl
     enabled: () => Boolean(process.env.TELEGRAM_BOT_TOKEN),
     run: async () => {
       const olderThan = new Date(Date.now() - 12 * 3600_000);
-      const [{ n }] = await db
-        .select({ n: sql<number>`count(*)` })
-        .from(schema.payments)
-        .where(and(eq(schema.payments.provider, "sbp"), eq(schema.payments.status, "PENDING"), isNotNull(schema.payments.claimedAt), lt(schema.payments.claimedAt, olderThan)));
-      if (Number(n) > 0) await notifyOwner(`⏰ ${n} оплат(ы) по СБП ждут подтверждения больше 12 часов: ${process.env.APP_URL ?? ""}/admin`);
-      return { pending: Number(n) };
+      const sql = await ydb();
+      const [[row]] = await sql<[{ n: bigint }]>`
+        SELECT COUNT(*) AS n FROM payments
+        WHERE provider = ${"sbp"} AND status = ${"PENDING"} AND claimed_at IS NOT NULL AND claimed_at < ${olderThan}`;
+      const n = num(row?.n);
+      if (n > 0) await notifyOwner(`⏰ ${n} оплат(ы) по СБП ждут подтверждения больше 12 часов: ${process.env.APP_URL ?? ""}/admin`);
+      return { pending: n };
     },
   },
 ];

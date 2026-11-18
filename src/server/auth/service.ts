@@ -1,8 +1,11 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { db, schema } from "@/server/db";
+import { createId } from "@/server/id";
+import { ydb } from "@/server/ydb/client";
+import { isDuplicate } from "@/server/ydb/errors";
+import { camel } from "@/server/ydb/rows";
+import { nowSec, optDate, optText } from "@/server/ydb/values";
 import { AppError, AuthError } from "@/server/errors";
 import { audit } from "@/server/audit";
 import { getClientIp, rateLimit } from "@/server/security/rateLimit";
@@ -23,9 +26,15 @@ const registerSchema = z.object({
   invitedByCode: z.string().trim().max(64).optional(),
 });
 
-function isUniqueViolation(e: unknown): boolean {
-  const err = e as { code?: string; cause?: { code?: string } };
-  return err?.code === "23505" || err?.cause?.code === "23505";
+const emailTaken = () => new AppError("EMAIL_TAKEN", "Этот email уже зарегистрирован. Войдите в аккаунт.", 409);
+
+/** User (deleted ones included) by email via the users_by_email lookup table. */
+async function findUserByEmail(email: string): Promise<User | null> {
+  const sql = await ydb();
+  const [[ref]] = await sql<[{ user_id: string | null }]>`SELECT user_id FROM users_by_email WHERE email = ${email}`;
+  if (!ref?.user_id) return null;
+  const [[u]] = await sql<[Record<string, unknown>]>`SELECT * FROM users WHERE id = ${ref.user_id}`;
+  return u ? camel<User>(u) : null;
 }
 
 export async function registerUser(input: {
@@ -34,27 +43,31 @@ export async function registerUser(input: {
   const parsed = registerSchema.safeParse(input);
   if (!parsed.success) throw new AppError("VALIDATION", parsed.error.issues[0]?.message ?? "Проверьте введённые данные.");
   const v = parsed.data;
-  const existing = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, v.email)).limit(1);
-  if (existing[0]) throw new AppError("EMAIL_TAKEN", "Этот email уже зарегистрирован. Войдите в аккаунт.", 409);
+  if (await findUserByEmail(v.email)) throw emailTaken();
   const passwordHash = await hashPassword(v.password);
+  const now = nowSec();
+  const user: User = {
+    id: createId(), email: v.email, passwordHash, name: v.name ?? null, phone: null, platformRole: "USER", country: v.country,
+    inviteCode: createId(), invitedByCode: v.invitedByCode ?? null, createdAt: now, deletedAt: null,
+  };
+  const sql = await ydb();
   try {
-    const user = await db.transaction(async (tx) => {
-      const [u] = await tx
-        .insert(schema.users)
-        .values({ email: v.email, passwordHash, name: v.name ?? null, country: v.country, invitedByCode: v.invitedByCode ?? null })
-        .returning();
-      await tx.insert(schema.consents).values([
-        { userId: u.id, type: "terms", version: CONSENT_VERSION },
-        { userId: u.id, type: "pd_processing", version: CONSENT_VERSION },
-      ]);
-      return u;
+    await sql.begin(async (tx) => {
+      // users_by_email PK = email: a concurrent or repeated registration fails here (uniqueness).
+      await tx`INSERT INTO users_by_email (email, user_id) VALUES (${user.email}, ${user.id})`;
+      await tx`INSERT INTO users (id, email, password_hash, name, phone, platform_role, country, invite_code, invited_by_code, created_at)
+               VALUES (${user.id}, ${user.email}, ${passwordHash}, ${optText(user.name)}, ${optText(null)}, ${user.platformRole}, ${user.country},
+                       ${user.inviteCode}, ${optText(user.invitedByCode)}, ${now})`;
+      await tx`UPSERT INTO consents (id, user_id, type, version, granted_at) VALUES
+               (${createId()}, ${user.id}, ${"terms"}, ${CONSENT_VERSION}, ${now}),
+               (${createId()}, ${user.id}, ${"pd_processing"}, ${CONSENT_VERSION}, ${now})`;
     });
-    await audit("user.register", { actorUserId: user.id, meta: { country: v.country } });
-    return user;
   } catch (e) {
-    if (isUniqueViolation(e)) throw new AppError("EMAIL_TAKEN", "Этот email уже зарегистрирован. Войдите в аккаунт.", 409);
+    if (isDuplicate(e)) throw emailTaken();
     throw e;
   }
+  await audit("user.register", { actorUserId: user.id, meta: { country: v.country } });
+  return user;
 }
 
 export async function loginUser(email: string, password: string): Promise<User> {
@@ -66,8 +79,7 @@ export async function loginUser(email: string, password: string): Promise<User> 
   const perEmail = perPair.ok ? await rateLimit(`login-email:${normalized}`, 100, 15 * 60) : perPair;
   const rl = perPair.ok ? perEmail : perPair;
   if (!rl.ok) throw new AppError("RATE_LIMITED", `Слишком много попыток входа. Повторите через ${Math.ceil(rl.retryAfter / 60)} мин.`, 429);
-  const rows = await db.select().from(schema.users).where(eq(schema.users.email, normalized)).limit(1);
-  const user = rows[0];
+  const user = await findUserByEmail(normalized);
   if (!user || user.deletedAt) {
     await verifyPassword(String(password ?? ""), DUMMY_HASH);
     throw new AuthError("INVALID_CREDENTIALS", "Неверный email или пароль.");
@@ -84,13 +96,14 @@ export async function loginUser(email: string, password: string): Promise<User> 
 /** Anonymizes personal data (152-ФЗ / Закон РБ №99-З). Transactions are kept for accounting. */
 export async function deleteUserData(userId: string): Promise<void> {
   const randomHash = await hashPassword(randomBytes(32).toString("base64url"));
-  await db.transaction(async (tx) => {
-    await tx
-      .update(schema.users)
-      .set({ email: `deleted-${userId}@deleted.invalid`, name: null, phone: null, passwordHash: randomHash, deletedAt: new Date() })
-      .where(eq(schema.users.id, userId));
-    await tx.delete(schema.sessions).where(eq(schema.sessions.userId, userId));
-    await tx.delete(schema.customerTokens).where(eq(schema.customerTokens.userId, userId));
+  const sql = await ydb();
+  await sql.begin(async (tx) => {
+    const [[u]] = await tx<[{ email: string | null }]>`SELECT email FROM users WHERE id = ${userId}`;
+    if (u?.email) await tx`DELETE FROM users_by_email WHERE email = ${u.email} AND user_id = ${userId}`;
+    await tx`UPDATE users SET email = ${`deleted-${userId}@deleted.invalid`}, name = ${optText(null)}, phone = ${optText(null)},
+             password_hash = ${randomHash}, deleted_at = ${optDate(nowSec())} WHERE id = ${userId}`;
+    await tx`DELETE FROM sessions WHERE user_id = ${userId}`;
+    await tx`DELETE FROM customer_tokens WHERE user_id = ${userId}`;
   });
   await audit("user.delete_data", { actorUserId: userId });
 }

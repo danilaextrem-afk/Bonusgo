@@ -1,22 +1,25 @@
 import { headers } from "next/headers";
-import { sql } from "drizzle-orm";
-import { db } from "@/server/db";
+import { ydb } from "@/server/ydb/client";
+import { nowSec } from "@/server/ydb/values";
 
 /**
- * Fixed-window rate limiter backed by one atomic upsert on rate_limits.
+ * Fixed-window rate limiter: one serializable transaction reads the rate_limits row, computes the
+ * new window/count and UPSERTs it (concurrent hits conflict and are retried, so none are lost).
  * Returns ok=false once more than `limit` hits happened in the current window.
  */
 export async function rateLimit(key: string, limit: number, windowSec: number): Promise<{ ok: boolean; retryAfter: number }> {
-  const res = await db.execute(sql`
-    INSERT INTO rate_limits (key, window_start, count) VALUES (${key}, now(), 1)
-    ON CONFLICT (key) DO UPDATE SET
-      count = CASE WHEN rate_limits.window_start <= now() - make_interval(secs => ${windowSec}::double precision) THEN 1 ELSE rate_limits.count + 1 END,
-      window_start = CASE WHEN rate_limits.window_start <= now() - make_interval(secs => ${windowSec}::double precision) THEN now() ELSE rate_limits.window_start END
-    RETURNING count, GREATEST(0, EXTRACT(EPOCH FROM (window_start + make_interval(secs => ${windowSec}::double precision) - now())))::float8 AS retry`);
-  const row = res.rows[0] as { count: number; retry: number } | undefined;
-  const count = Number(row?.count ?? 1);
+  const sql = await ydb();
+  const { count, retry } = await sql.begin(async (tx) => {
+    const now = nowSec();
+    const [[row]] = await tx<[{ window_start: Date | null; count: number | null }]>`SELECT window_start, \`count\` FROM rate_limits WHERE \`key\` = ${key}`;
+    const fresh = !row?.window_start || new Date(row.window_start).getTime() <= now.getTime() - windowSec * 1000;
+    const start = fresh ? now : new Date(row!.window_start!);
+    const n = fresh ? 1 : Number(row!.count ?? 0) + 1;
+    await tx`UPSERT INTO rate_limits (\`key\`, window_start, \`count\`) VALUES (${key}, ${start}, ${n})`;
+    return { count: n, retry: Math.max(0, (start.getTime() + windowSec * 1000 - now.getTime()) / 1000) };
+  });
   if (count <= limit) return { ok: true, retryAfter: 0 };
-  return { ok: false, retryAfter: Math.max(1, Math.ceil(Number(row?.retry ?? windowSec))) };
+  return { ok: false, retryAfter: Math.max(1, Math.ceil(retry)) };
 }
 
 /** Best-effort client IP from proxy headers (first X-Forwarded-For hop, then X-Real-IP). */

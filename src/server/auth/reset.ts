@@ -1,8 +1,10 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, isNull } from "drizzle-orm";
 import { audit } from "@/server/audit";
-import { db, schema } from "@/server/db";
+import { createId } from "@/server/id";
+import { ydb } from "@/server/ydb/client";
+import { camel, type User } from "@/server/ydb/rows";
+import { nowSec } from "@/server/ydb/values";
 import { emailConfigured, sendEmail } from "@/server/email";
 import { AppError } from "@/server/errors";
 import { getClientIp, rateLimit } from "@/server/security/rateLimit";
@@ -25,10 +27,16 @@ export async function requestPasswordReset(rawEmail: string): Promise<void> {
   if (!byIp.ok) throw new AppError("RATE_LIMITED", "Слишком много запросов. Попробуйте позже.", 429);
   if (!byEmail.ok) return; // silently drop: same response as success
   if (!emailConfigured()) throw new AppError("EMAIL_UNAVAILABLE", "Восстановление по почте пока не подключено. Напишите в поддержку.", 503);
-  const [user] = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
+  const sql = await ydb();
+  const [[ref]] = await sql<[{ user_id: string | null }]>`SELECT user_id FROM users_by_email WHERE email = ${email}`;
+  if (!ref?.user_id) return;
+  const [[row]] = await sql<[Record<string, unknown>]>`SELECT * FROM users WHERE id = ${ref.user_id}`;
+  const user = row ? camel<User>(row) : null;
   if (!user || user.deletedAt) return;
   const token = randomBytes(32).toString("base64url");
-  await db.insert(schema.passwordResets).values({ userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + TTL_MIN * 60_000) });
+  const now = nowSec();
+  await sql`INSERT INTO password_resets (token_hash, id, user_id, expires_at, created_at)
+            VALUES (${sha256(token)}, ${createId()}, ${user.id}, ${new Date(now.getTime() + TTL_MIN * 60_000)}, ${now})`;
   try {
     await sendEmail(
       user.email,
@@ -46,18 +54,19 @@ export async function resetPassword(token: string, newPassword: string): Promise
   if (typeof newPassword !== "string" || newPassword.length < 8 || newPassword.length > 200) throw new AppError("VALIDATION", "Пароль — не менее 8 символов.");
   if (typeof token !== "string" || token.length < 20 || token.length > 100) throw new AppError("INVALID_TOKEN", "Ссылка недействительна или устарела. Запросите новую.");
   const passwordHash = await hashPassword(newPassword);
-  const userId = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(schema.passwordResets)
-      .set({ usedAt: new Date() })
-      .where(and(eq(schema.passwordResets.tokenHash, sha256(token)), isNull(schema.passwordResets.usedAt), gt(schema.passwordResets.expiresAt, new Date())))
-      .returning({ userId: schema.passwordResets.userId });
-    if (!row) throw new AppError("INVALID_TOKEN", "Ссылка недействительна или устарела. Запросите новую.");
-    await tx.update(schema.users).set({ passwordHash }).where(eq(schema.users.id, row.userId));
-    await tx.delete(schema.sessions).where(eq(schema.sessions.userId, row.userId));
-    // Other outstanding links for this user stop working too.
-    await tx.update(schema.passwordResets).set({ usedAt: new Date() }).where(and(eq(schema.passwordResets.userId, row.userId), isNull(schema.passwordResets.usedAt)));
-    return row.userId;
+  const sql = await ydb();
+  const invalid = () => new AppError("INVALID_TOKEN", "Ссылка недействительна или устарела. Запросите новую.");
+  const userId = await sql.begin(async (tx) => {
+    const now = nowSec();
+    const [[row]] = await tx<[{ user_id: string | null; used_at: Date | null; expires_at: Date | null }]>`
+      SELECT user_id, used_at, expires_at FROM password_resets WHERE token_hash = ${sha256(token)}`;
+    if (!row?.user_id || row.used_at || !row.expires_at || new Date(row.expires_at).getTime() <= Date.now()) throw invalid();
+    const uid = row.user_id;
+    await tx`UPDATE users SET password_hash = ${passwordHash} WHERE id = ${uid}`;
+    await tx`DELETE FROM sessions WHERE user_id = ${uid}`;
+    // Marks this link used; other outstanding links for this user stop working too.
+    await tx`UPDATE password_resets SET used_at = ${now} WHERE user_id = ${uid} AND used_at IS NULL`;
+    return uid;
   });
   await audit("auth.password_reset", { actorUserId: userId });
 }

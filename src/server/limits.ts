@@ -1,12 +1,16 @@
 import "server-only";
-import { and, count, eq, gt, ne, sql } from "drizzle-orm";
-import { db, schema } from "@/server/db";
+import type { SQL, TX } from "@ydbjs/query";
+import type { db } from "@/server/db";
 import { LimitError, NotFoundError } from "@/server/errors";
+import { ydb } from "@/server/ydb/client";
+import { camel, type Company } from "@/server/ydb/rows";
+import { num } from "@/server/ydb/values";
 import { ACTIVE_CUSTOMER_DAYS, PLAN_LIMITS, type PlanId, type PlanLimits } from "@/lib/plans";
 
-type Company = typeof schema.companies.$inferSelect;
-/** db or a transaction: lets callers run checks on the connection that holds a lock. */
-type Q = Pick<typeof db, "select" | "execute">;
+/** The YDB client or a transaction (`sql.begin` callback arg): checks run inside the caller's tx. */
+type Q = SQL;
+type Row = Record<string, unknown>;
+const conn = async (q?: Q): Promise<Q> => q ?? (await ydb());
 
 /** Paid plan whose period has ended falls back to FREE. A paid plan with no expiry is treated as active. */
 export function effectivePlan(c: Pick<Company, "plan" | "planExpiresAt">): PlanId {
@@ -15,13 +19,15 @@ export function effectivePlan(c: Pick<Company, "plan" | "planExpiresAt">): PlanI
   return c.plan;
 }
 
-async function loadCompany(companyId: string, q: Q = db): Promise<Company> {
-  const rows = await q.select().from(schema.companies).where(eq(schema.companies.id, companyId)).limit(1);
-  if (!rows[0] || rows[0].deletedAt) throw new NotFoundError("Компания не найдена.");
-  return rows[0];
+async function loadCompany(companyId: string, q?: Q): Promise<Company> {
+  const sql = await conn(q);
+  const [[row]] = await sql<[Row]>`SELECT * FROM companies WHERE id = ${companyId}`;
+  const c = row ? camel<Company>(row) : null;
+  if (!c || c.deletedAt) throw new NotFoundError("Компания не найдена.");
+  return c;
 }
 
-async function planOf(companyId: string, q: Q = db): Promise<{ plan: PlanId; limits: PlanLimits }> {
+async function planOf(companyId: string, q?: Q): Promise<{ plan: PlanId; limits: PlanLimits }> {
   const plan = effectivePlan(await loadCompany(companyId, q));
   return { plan, limits: PLAN_LIMITS[plan] };
 }
@@ -34,33 +40,36 @@ function activeSince(): Date {
   return new Date(Date.now() - ACTIVE_CUSTOMER_DAYS * 86400_000);
 }
 
-async function countVenues(companyId: string, q: Q = db) {
-  return Number((await q.select({ n: count() }).from(schema.venues).where(eq(schema.venues.companyId, companyId)))[0]?.n ?? 0);
+async function countVenues(companyId: string, q?: Q) {
+  const sql = await conn(q);
+  const [[r]] = await sql<[{ n: bigint }]>`SELECT COUNT(*) AS n FROM venues VIEW idx_company WHERE company_id = ${companyId}`;
+  return num(r?.n);
 }
-async function countPrograms(companyId: string, q: Q = db) {
-  return Number((await q.select({ n: count() }).from(schema.programs).where(eq(schema.programs.companyId, companyId)))[0]?.n ?? 0);
+async function countPrograms(companyId: string, q?: Q) {
+  const sql = await conn(q);
+  const [[r]] = await sql<[{ n: bigint }]>`SELECT COUNT(*) AS n FROM programs VIEW idx_company WHERE company_id = ${companyId}`;
+  return num(r?.n);
 }
-async function countStaff(companyId: string, q: Q = db) {
-  return Number(
-    (await q.select({ n: count() }).from(schema.memberships).where(and(eq(schema.memberships.companyId, companyId), ne(schema.memberships.role, "OWNER"))))[0]?.n ?? 0,
-  );
+async function countStaff(companyId: string, q?: Q) {
+  const sql = await conn(q);
+  const [[r]] = await sql<[{ n: bigint }]>`SELECT COUNT(*) AS n FROM memberships WHERE company_id = ${companyId} AND role != ${"OWNER"}`;
+  return num(r?.n);
 }
-async function countActiveCustomers(companyId: string) {
-  const r = await db
-    .select({ n: sql<number>`count(distinct ${schema.cards.customerId})` })
-    .from(schema.cards)
-    .where(and(eq(schema.cards.companyId, companyId), gt(schema.cards.lastActivityAt, activeSince())));
-  return Number(r[0]?.n ?? 0);
+async function countActiveCustomers(companyId: string, q?: Q) {
+  const sql = await conn(q);
+  const [[r]] = await sql<[{ n: bigint }]>`
+    SELECT COUNT(DISTINCT customer_id) AS n FROM cards VIEW idx_company WHERE company_id = ${companyId} AND last_activity_at > ${activeSince()}`;
+  return num(r?.n);
 }
 
-export async function assertCanAddVenue(companyId: string, q: Q = db): Promise<void> {
+export async function assertCanAddVenue(companyId: string, q?: Q): Promise<void> {
   const { plan, limits } = await planOf(companyId, q);
   if ((await countVenues(companyId, q)) >= limits.venues) {
     throw new LimitError(`Лимит тарифа ${plan}: ${limits.venues} заведени${limits.venues === 1 ? "е" : "й"}. ${upgradeHint(plan)}`, "venues");
   }
 }
 
-export async function assertCanAddProgram(companyId: string, type: "STAMPS" | "POINTS", q: Q = db): Promise<void> {
+export async function assertCanAddProgram(companyId: string, type: "STAMPS" | "POINTS", q?: Q): Promise<void> {
   const { plan, limits } = await planOf(companyId, q);
   if (type === "POINTS" && !limits.pointsPrograms) throw new LimitError(`Бальные программы недоступны на тарифе ${plan}. ${upgradeHint(plan)}`, "pointsPrograms");
   if ((await countPrograms(companyId, q)) >= limits.programs) {
@@ -68,7 +77,7 @@ export async function assertCanAddProgram(companyId: string, type: "STAMPS" | "P
   }
 }
 
-export async function assertCanAddStaff(companyId: string, q: Q = db): Promise<void> {
+export async function assertCanAddStaff(companyId: string, q?: Q): Promise<void> {
   const { plan, limits } = await planOf(companyId, q);
   if ((await countStaff(companyId, q)) >= limits.staff) {
     throw new LimitError(
@@ -78,9 +87,9 @@ export async function assertCanAddStaff(companyId: string, q: Q = db): Promise<v
   }
 }
 
-export async function assertCanAddActiveCustomer(companyId: string): Promise<void> {
-  const { plan, limits } = await planOf(companyId);
-  if ((await countActiveCustomers(companyId)) >= limits.activeCustomers) {
+export async function assertCanAddActiveCustomer(companyId: string, q?: Q): Promise<void> {
+  const { plan, limits } = await planOf(companyId, q);
+  if ((await countActiveCustomers(companyId, q)) >= limits.activeCustomers) {
     throw new LimitError(`Лимит тарифа ${plan}: ${limits.activeCustomers} активных клиентов. ${upgradeHint(plan)}`, "activeCustomers");
   }
 }
@@ -103,9 +112,12 @@ export async function getUsage(companyId: string): Promise<{ venues: number; pro
 }
 
 /** Ids of the oldest `n` rows: what remains usable after a downgrade (extra items are frozen, not deleted). */
-async function oldestIds(table: typeof schema.venues | typeof schema.programs, companyId: string, n: number): Promise<Set<string>> {
+async function oldestIds(table: "venues" | "programs", companyId: string, n: number): Promise<Set<string>> {
   if (n <= 0) return new Set();
-  const rows = await db.select({ id: table.id }).from(table).where(eq(table.companyId, companyId)).orderBy(table.createdAt, table.id).limit(n);
+  const sql = await ydb();
+  const limit = sql.unsafe(String(Math.min(Math.floor(n), 1_000_000)));
+  const [rows] = await sql<[{ id: string }]>`
+    SELECT id FROM ${sql.identifier(table)} VIEW idx_company WHERE company_id = ${companyId} ORDER BY created_at, id LIMIT ${limit}`;
   return new Set(rows.map((r) => r.id));
 }
 
@@ -124,16 +136,17 @@ export async function assertOperationAllowed(
   const frozen = (what: string) => new LimitError(`${what} недоступно на тарифе ${plan}. ${upgradeHint(plan)}`, "frozen");
   if (program.type === "POINTS" && !limits.pointsPrograms) throw frozen("Бальная программа");
   if (opts.usesReward && !limits.rewards) throw frozen("Списание наград");
-  const [programs, venues] = await Promise.all([oldestIds(schema.programs, company.id, limits.programs), oldestIds(schema.venues, company.id, limits.venues)]);
+  const [programs, venues] = await Promise.all([oldestIds("programs", company.id, limits.programs), oldestIds("venues", company.id, limits.venues)]);
   if (!programs.has(program.id)) throw frozen("Эта программа сверх лимита —");
   if (!venues.has(program.venueId)) throw frozen("Это заведение сверх лимита —");
   if (membership.role !== "OWNER") {
-    const staff = await db
-      .select({ id: schema.memberships.id })
-      .from(schema.memberships)
-      .where(and(eq(schema.memberships.companyId, company.id), ne(schema.memberships.role, "OWNER")))
-      .orderBy(schema.memberships.createdAt, schema.memberships.id)
-      .limit(Math.max(0, limits.staff));
+    const n = Math.max(0, Math.min(Math.floor(limits.staff), 1_000_000));
+    let staff: { id: string }[] = [];
+    if (n > 0) {
+      const sql = await ydb();
+      [staff] = await sql<[{ id: string }]>`
+        SELECT id FROM memberships WHERE company_id = ${company.id} AND role != ${"OWNER"} ORDER BY created_at, id LIMIT ${sql.unsafe(String(n))}`;
+    }
     if (!staff.some((s) => s.id === membership.id)) throw frozen("Доступ сотрудника");
   }
 }
@@ -143,10 +156,22 @@ export function brandingAllowed(company: Pick<Company, "plan" | "planExpiresAt">
   return PLAN_LIMITS[effectivePlan(company)].customBranding;
 }
 
-/** Serializes "check limit → insert" per company and resource, so parallel requests can't overshoot a limit. */
-export async function withLimitLock<T>(companyId: string, resource: string, fn: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>): Promise<T> {
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`limit:${resource}:${companyId}`}))`);
-    return fn(tx);
-  });
+/**
+ * Transaction handed to `withLimitLock` callbacks: a YDB tx. TRANSITIONAL: it is also typed as the old
+ * Drizzle tx only so not-yet-migrated callers (loyalty/service.ts) still typecheck; at runtime it is a YDB
+ * tx only. Drop the Drizzle half once loyalty is migrated.
+ */
+type DrizzleTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type LimitTx = TX & DrizzleTx;
+
+/**
+ * "check limit → insert" in one serializable YDB transaction: the limit check reads the company's rows
+ * inside the tx, so a parallel insert aborts (and retries) one of the transactions — no overshoot.
+ * The callback may be retried: keep it free of side effects outside the DB.
+ */
+export async function withLimitLock<T>(companyId: string, resource: string, fn: (tx: LimitTx) => Promise<T>): Promise<T> {
+  void companyId;
+  void resource;
+  const sql = await ydb();
+  return sql.begin((tx) => fn(tx as LimitTx));
 }

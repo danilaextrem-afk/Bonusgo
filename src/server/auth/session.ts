@@ -3,11 +3,12 @@ import { cache } from "react";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { and, eq, gt, isNull } from "drizzle-orm";
-import { db, schema } from "@/server/db";
 import { ForbiddenError } from "@/server/errors";
+import { ydb } from "@/server/ydb/client";
+import { camel, type Session, type User } from "@/server/ydb/rows";
+import { nowSec, optText } from "@/server/ydb/values";
 
-export type User = typeof schema.users.$inferSelect;
+export type { User };
 
 export const SESSION_COOKIE = "bg_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -18,7 +19,7 @@ export function sha256(v: string): string {
 
 export async function createSession(userId: string): Promise<{ expiresAt: Date }> {
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  const expiresAt = new Date(Math.floor((Date.now() + SESSION_TTL_MS) / 1000) * 1000);
   let ip: string | null = null;
   let userAgent: string | null = null;
   try {
@@ -28,14 +29,9 @@ export async function createSession(userId: string): Promise<{ expiresAt: Date }
   } catch {
     /* no request scope */
   }
-  await db.insert(schema.sessions).values({
-    id: sha256(token),
-    userId,
-    csrfToken: randomBytes(32).toString("base64url"),
-    expiresAt,
-    ip,
-    userAgent,
-  });
+  const sql = await ydb();
+  await sql`INSERT INTO sessions (id, user_id, csrf_token, expires_at, ip, user_agent, created_at)
+            VALUES (${sha256(token)}, ${userId}, ${randomBytes(32).toString("base64url")}, ${expiresAt}, ${optText(ip)}, ${optText(userAgent)}, ${nowSec()})`;
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -60,13 +56,13 @@ async function readSessionToken(): Promise<string | null> {
 const loadSession = cache(async () => {
   const token = await readSessionToken();
   if (!token) return null;
-  const rows = await db
-    .select({ session: schema.sessions, user: schema.users })
-    .from(schema.sessions)
-    .innerJoin(schema.users, eq(schema.users.id, schema.sessions.userId))
-    .where(and(eq(schema.sessions.id, sha256(token)), gt(schema.sessions.expiresAt, new Date()), isNull(schema.users.deletedAt)))
-    .limit(1);
-  return rows[0] ?? null;
+  const sql = await ydb();
+  const [[s]] = await sql<[Record<string, unknown>]>`SELECT * FROM sessions WHERE id = ${sha256(token)} AND expires_at > ${new Date()}`;
+  if (!s) return null;
+  const session = camel<Session>(s);
+  const [[u]] = await sql<[Record<string, unknown>]>`SELECT * FROM users WHERE id = ${session.userId} AND deleted_at IS NULL`;
+  if (!u) return null;
+  return { session, user: camel<User>(u) };
 });
 
 export const getCurrentUser = cache(async (): Promise<User | null> => {
@@ -102,7 +98,10 @@ export async function requirePlatformAdmin(): Promise<User> {
 
 export async function destroySession(): Promise<void> {
   const token = await readSessionToken();
-  if (token) await db.delete(schema.sessions).where(eq(schema.sessions.id, sha256(token)));
+  if (token) {
+    const sql = await ydb();
+    await sql`DELETE FROM sessions WHERE id = ${sha256(token)}`;
+  }
   try {
     const jar = await cookies();
     jar.delete(SESSION_COOKIE);

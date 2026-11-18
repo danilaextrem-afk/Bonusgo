@@ -2,11 +2,11 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
-import { db, schema } from "@/server/db";
 import { requireUser } from "@/server/auth/session";
 import { getUserCompanies, requireMembership } from "@/server/tenancy";
 import { effectivePlan } from "@/server/limits";
+import { ydb } from "@/server/ydb/client";
+import { camelAll, type Program, type Reward, type Venue } from "@/server/ydb/rows";
 import { PLAN_LIMITS, type PlanId, type PlanLimits } from "@/lib/plans";
 
 export const COMPANY_COOKIE = "bg_company";
@@ -49,14 +49,21 @@ export async function setCompanyCookie(id: string) {
 }
 
 // Own-tenant listings (always filtered by a companyId that was verified through membership).
-export function listVenues(companyId: string) {
-  return db.select().from(schema.venues).where(eq(schema.venues.companyId, companyId)).orderBy(asc(schema.venues.createdAt));
+type Row = Record<string, unknown>;
+export async function listVenues(companyId: string): Promise<Venue[]> {
+  const sql = await ydb();
+  const [rows] = await sql<[Row]>`SELECT * FROM venues VIEW idx_company WHERE company_id = ${companyId} ORDER BY created_at, id`;
+  return camelAll<Venue>(rows);
 }
-export function listPrograms(companyId: string) {
-  return db.select().from(schema.programs).where(eq(schema.programs.companyId, companyId)).orderBy(asc(schema.programs.createdAt));
+export async function listPrograms(companyId: string): Promise<Program[]> {
+  const sql = await ydb();
+  const [rows] = await sql<[Row]>`SELECT * FROM programs VIEW idx_company WHERE company_id = ${companyId} ORDER BY created_at, id`;
+  return camelAll<Program>(rows);
 }
-export function listRewards(companyId: string) {
-  return db.select().from(schema.rewards).where(eq(schema.rewards.companyId, companyId)).orderBy(asc(schema.rewards.cost));
+export async function listRewards(companyId: string): Promise<Reward[]> {
+  const sql = await ydb();
+  const [rows] = await sql<[Row]>`SELECT * FROM rewards WHERE company_id = ${companyId} ORDER BY cost, id`;
+  return camelAll<Reward>(rows);
 }
 
 export function sp1(v: string | string[] | undefined): string | undefined {
