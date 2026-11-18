@@ -23,7 +23,7 @@ export function ProgramFields({ pointsAllowed, defaults }: { pointsAllowed: bool
         </div>
         {!pointsAllowed && (
           <p className="mt-2 text-xs text-muted">
-            Баллы доступны на тарифах PRO и TOP. <Link href="/app/billing" className="text-neon underline underline-offset-4">Улучшить тариф</Link>
+            Баллы доступны на тарифах PRO и TOP. <Link href="/app/billing" className="inline-flex min-h-10 items-center text-neon underline underline-offset-4">Улучшить тариф</Link>
           </p>
         )}
       </fieldset>

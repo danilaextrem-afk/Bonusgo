@@ -43,7 +43,7 @@ export default async function StaffPage() {
                   <ActionForm action={removeStaffAction} confirm="Убрать сотрудника из компании?">
                     <input type="hidden" name="companyId" value={company.id} />
                     <input type="hidden" name="membershipId" value={m.id} />
-                    <SubmitButton className="text-xs text-danger underline">Убрать</SubmitButton>
+                    <SubmitButton className="min-h-10 px-2 text-xs text-danger underline">Убрать</SubmitButton>
                   </ActionForm>
                 )}
               </div>

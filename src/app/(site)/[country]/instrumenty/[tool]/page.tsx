@@ -44,7 +44,7 @@ export default async function Page({ params }: { params: Promise<{ country: stri
         </ul>
         <aside className="mt-6 max-w-3xl rounded-[18px] border border-line border-l-[3px] border-l-neon bg-surface p-5">
           <p className="text-xs font-semibold uppercase tracking-wider text-neon">Пример</p>
-          <p className="mt-2 text-[15px] leading-relaxed text-muted">{t.example}</p>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">{c === "by" && t.exampleBy ? t.exampleBy : t.example}</p>
         </aside>
       </Section>
       <Section title="Вопросы и ответы">

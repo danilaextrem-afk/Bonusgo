@@ -13,7 +13,7 @@ export default function ResetRequestPage() {
   const available = passwordResetAvailable();
   return (
     <main className="container-x flex min-h-dvh max-w-md flex-col justify-center py-10">
-      <Link href="/" className="mb-6 text-2xl font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
+      <Link href="/" className="mb-6 inline-flex min-h-10 items-center self-start text-2xl font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
       <div className="card">
         <h1 className="mb-2 text-xl font-bold">Восстановление пароля</h1>
         {available ? (
@@ -28,7 +28,7 @@ export default function ResetRequestPage() {
           <Notice tone="warn">Восстановление по почте скоро появится. Пока напишите нам со страницы «Контакты» — поможем вернуть доступ.</Notice>
         )}
       </div>
-      <p className="mt-4 text-center text-sm text-muted"><Link className="text-neon underline underline-offset-4" href="/login">Вернуться ко входу</Link></p>
+      <p className="mt-4 text-center text-sm text-muted"><Link className="inline-flex min-h-10 items-center text-neon underline underline-offset-4" href="/login">Вернуться ко входу</Link></p>
     </main>
   );
 }

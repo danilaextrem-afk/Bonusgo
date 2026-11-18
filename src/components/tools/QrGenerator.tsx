@@ -140,7 +140,7 @@ export function QrGenerator() {
       <div className="card space-y-4">
         <div role="group" aria-label="Тип данных" className="inline-flex rounded-xl border border-line p-1 text-sm">
           {(["url", "text"] as const).map((m) => (
-            <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} className={`rounded-lg px-4 py-2 font-medium ${mode === m ? "bg-neon text-black" : "text-muted hover:text-text"}`}>
+            <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)} className={`min-h-10 rounded-lg px-4 py-2 font-medium ${mode === m ? "bg-neon text-black" : "text-muted hover:text-text"}`}>
               {m === "url" ? "Ссылка" : "Текст"}
             </button>
           ))}

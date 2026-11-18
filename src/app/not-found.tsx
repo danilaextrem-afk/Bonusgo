@@ -22,7 +22,7 @@ export default function NotFound() {
       <p className="mt-3 max-w-md text-muted">Возможно, адрес изменился или в нём опечатка. Перейдите в один из разделов.</p>
       <ul className="mt-8 flex max-w-xl flex-wrap justify-center gap-3">
         {LINKS.map((l) => (
-          <li key={l.href}><Link href={l.href} className="btn-ghost !py-2">{l.label}</Link></li>
+          <li key={l.href}><Link href={l.href} className="btn-ghost min-h-10 !py-2">{l.label}</Link></li>
         ))}
       </ul>
     </main>

@@ -36,7 +36,7 @@ export default async function DashboardPage() {
             {steps.map((s) => (
               <li key={s.href} className="flex items-center gap-2">
                 <span className={s.done ? "text-neon" : "text-muted"}>{s.done ? "✓" : "○"}</span>
-                {s.done ? <span className="text-muted line-through">{s.label}</span> : <Link href={s.href} className="underline underline-offset-4">{s.label}</Link>}
+                {s.done ? <span className="text-muted line-through">{s.label}</span> : <Link href={s.href} className="inline-flex min-h-10 items-center underline underline-offset-4">{s.label}</Link>}
               </li>
             ))}
           </ol>
@@ -51,7 +51,7 @@ export default async function DashboardPage() {
       <div className="card mt-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Использование тарифа</h2>
-          <Link href="/app/billing" className="text-sm text-neon underline underline-offset-4">{plan === "TOP" ? "Тариф" : "Улучшить"}</Link>
+          <Link href="/app/billing" className="inline-flex min-h-10 items-center text-sm text-neon underline underline-offset-4">{plan === "TOP" ? "Тариф" : "Улучшить"}</Link>
         </div>
         <UsageBar label="Заведения" used={usage.venues} limit={usage.limits.venues} />
         <UsageBar label="Программы" used={usage.programs} limit={usage.limits.programs} />

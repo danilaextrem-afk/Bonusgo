@@ -91,7 +91,7 @@ export function ShareButton() {
     setTimeout(() => setState("idle"), 2500);
   };
   return (
-    <button type="button" onClick={copy} className="btn-ghost !py-2 text-xs">
+    <button type="button" onClick={copy} className="btn-ghost min-h-10 !py-2 text-xs">
       {state === "ok" ? "Ссылка скопирована" : state === "fail" ? "Скопируйте адрес из строки браузера" : "Поделиться расчётом"}
     </button>
   );

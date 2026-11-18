@@ -20,7 +20,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const qs = next ? `&next=${encodeURIComponent(next)}` : "";
   return (
     <main className="container-x flex min-h-dvh max-w-md flex-col justify-center py-10">
-      <Link href="/" className="mb-6 text-2xl font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
+      <Link href="/" className="mb-6 inline-flex min-h-10 items-center self-start text-2xl font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
       <div className="card">
         <h1 className="mb-4 text-xl font-bold">Вход</h1>
         {isDemoMode() && <div className="mb-4"><Notice tone="warn">Тестовый режим: не вводите реальные персональные данные</Notice></div>}
@@ -30,11 +30,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <Field label="Пароль"><input className="input" type="password" name="password" autoComplete="current-password" required /></Field>
           <SubmitButton className="btn-primary w-full">Войти</SubmitButton>
         </ActionForm>
-        <p className="mt-3 text-right text-sm"><Link className="text-muted underline underline-offset-4 hover:text-neon" href="/reset">Забыли пароль?</Link></p>
+        <p className="mt-3 text-right text-sm"><Link className="inline-flex min-h-10 items-center text-muted underline underline-offset-4 hover:text-neon" href="/reset">Забыли пароль?</Link></p>
       </div>
       <p className="mt-4 text-center text-sm text-muted">
-        Нет аккаунта? <Link className="text-neon underline underline-offset-4" href={`/register?role=customer${qs}`}>Я клиент</Link> ·{" "}
-        <Link className="text-neon underline underline-offset-4" href="/register?role=business">Я бизнес</Link>
+        Нет аккаунта? <Link className="inline-flex min-h-10 items-center text-neon underline underline-offset-4" href={`/register?role=customer${qs}`}>Я клиент</Link> ·{" "}
+        <Link className="inline-flex min-h-10 items-center text-neon underline underline-offset-4" href="/register?role=business">Я бизнес</Link>
       </p>
     </main>
   );

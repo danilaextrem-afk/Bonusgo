@@ -141,7 +141,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             <span className={`font-semibold ${diag.failures30d > 0 ? "text-danger" : ""}`}>{diag.failures30d}</span>
           </div>
           <details>
-            <summary className="cursor-pointer font-medium">Последние события ({diag.lastEvents.length})</summary>
+            <summary className="flex min-h-10 cursor-pointer items-center font-medium">Последние события ({diag.lastEvents.length})</summary>
             {diag.lastEvents.length === 0 ? (
               <p className="mt-2 text-muted">Событий нет.</p>
             ) : (

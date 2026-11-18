@@ -68,12 +68,12 @@ export default async function VenuePage({ params }: { params: Promise<{ slug: st
           })}
         </div>
         {!user && (
-          <p className="mt-4 text-xs text-muted">Уже есть аккаунт? <Link className="underline underline-offset-4" href={`/login?next=${encodeURIComponent(`/v/${slug}`)}`}>Войти</Link></p>
+          <p className="mt-4 text-xs text-muted">Уже есть аккаунт? <Link className="inline-flex min-h-10 items-center px-2 underline underline-offset-4" href={`/login?next=${encodeURIComponent(`/v/${slug}`)}`}>Войти</Link></p>
         )}
       </div>
       {showFooter && (
         <p className="mt-4 text-center text-xs text-muted">
-          <Link href={`/${home}`} className="underline underline-offset-4">Создать свою бонусную карту — QRonus</Link>
+          <Link href={`/${home}`} className="inline-flex min-h-10 items-center underline underline-offset-4">Создать свою бонусную карту — QRonus</Link>
         </p>
       )}
     </main>

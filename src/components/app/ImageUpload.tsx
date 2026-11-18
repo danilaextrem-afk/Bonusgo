@@ -45,7 +45,7 @@ export function ImageUpload({ name, initial, disabled }: { name: string; initial
             type="file"
             accept="image/png,image/jpeg,image/webp"
             disabled={disabled}
-            className="text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-line file:bg-surface-2 file:px-3 file:py-2 file:text-text"
+            className="text-xs text-muted file:mr-3 file:rounded-lg file:border file:border-line file:bg-surface-2 file:min-h-10 file:px-3 file:py-2 file:text-text"
             aria-label="Загрузить логотип"
             onChange={async (e) => {
               const f = e.target.files?.[0];

@@ -12,13 +12,13 @@ export function CustomerShell({ children, logoutAction }: { children: ReactNode;
   return (
     <div className="min-h-dvh">
       <header className="border-b border-line bg-surface">
-        <div className="container-x flex items-center justify-between gap-3 py-3">
-          <Link href="/me" className="text-lg font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
-          <nav aria-label="Меню клиента" className="flex items-center gap-1 text-sm">
+        <div className="container-x flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2">
+          <Link href="/me" className="inline-flex min-h-10 items-center text-lg font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
+          <nav aria-label="Меню клиента" className="order-last flex w-full items-center justify-between gap-1 text-sm sm:order-none sm:w-auto sm:justify-start">
             {LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className="rounded-xl px-3 py-2 text-muted hover:bg-surface-2 hover:text-text">{l.label}</Link>
+              <Link key={l.href} href={l.href} className="inline-flex min-h-10 items-center whitespace-nowrap rounded-xl px-3 py-2 text-muted hover:bg-surface-2 hover:text-text">{l.label}</Link>
             ))}
-            <form action={logoutAction}><SubmitButton className="btn-ghost !px-3 !py-1.5 text-xs">Выйти</SubmitButton></form>
+            <form action={logoutAction}><SubmitButton className="btn-ghost min-h-10 !px-3 !py-1.5 text-xs">Выйти</SubmitButton></form>
           </nav>
         </div>
       </header>

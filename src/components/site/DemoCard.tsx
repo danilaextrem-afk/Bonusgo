@@ -97,7 +97,7 @@ export function DemoCard() {
             <button type="button" className="btn-ghost" onClick={replay}>
               Попробовать использовать старый QR
             </button>
-            <button type="button" className="text-left text-sm text-muted underline underline-offset-4 hover:text-neon" onClick={reset}>
+            <button type="button" className="min-h-10 text-left text-sm text-muted underline underline-offset-4 hover:text-neon" onClick={reset}>
               Сбросить демо
             </button>
           </div>

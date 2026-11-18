@@ -25,7 +25,7 @@ export default async function Page({ params }: { params: Promise<{ country: stri
             <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-neon/40 bg-neon/10 text-neon"><Icon name="mail" /></span>
             <div>
               <p className="text-xs uppercase tracking-wider text-muted">Электронная почта</p>
-              <a href={`mailto:${email}`} className="text-lg font-semibold text-neon hover:underline">{email}</a>
+              <a href={`mailto:${email}`} className="inline-flex min-h-10 items-center text-lg font-semibold text-neon hover:underline">{email}</a>
             </div>
           </div>
           <p className="mt-5 text-sm leading-relaxed text-muted">Мы работаем онлайн и не принимаем посетителей в офисе. Реквизиты владельца сервиса указаны в документах: <a className="text-neon hover:underline" href={`/${c}/usloviya`}>условия использования</a>.</p>

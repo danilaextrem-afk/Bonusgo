@@ -94,7 +94,7 @@ export default async function HomePage({ params }: { params: Promise<{ country: 
             </li>
           ))}
         </ul>
-        <p className="mt-6"><Link href={`${b}/vozmozhnosti`} className="text-sm font-semibold text-neon hover:underline">Все возможности →</Link></p>
+        <p className="mt-6"><Link href={`${b}/vozmozhnosti`} className="inline-flex min-h-10 items-center text-sm font-semibold text-neon hover:underline">Все возможности →</Link></p>
       </Section>
 
       <Section id="otrasli" eyebrow="Решения" title="Для каких бизнесов" tone="alt">
@@ -114,7 +114,7 @@ export default async function HomePage({ params }: { params: Promise<{ country: 
       <Section id="tarify" eyebrow="Тарифы" title="Начните бесплатно, растите по мере необходимости">
         <PricingCards country={c} />
         <p className="mt-5 text-sm text-muted">
-          <Link href={`${b}/tarify`} className="font-semibold text-neon hover:underline">Сравнить тарифы и способы оплаты →</Link>
+          <Link href={`${b}/tarify`} className="inline-flex min-h-10 items-center font-semibold text-neon hover:underline">Сравнить тарифы и способы оплаты →</Link>
         </p>
       </Section>
 
@@ -139,7 +139,7 @@ export default async function HomePage({ params }: { params: Promise<{ country: 
 
       <Section id="faq" eyebrow="FAQ" title="Частые вопросы">
         <div className="max-w-3xl"><Faq items={generalFaq(c).slice(0, 6)} /></div>
-        <p className="mt-5 text-sm"><Link href={`${b}/faq`} className="font-semibold text-neon hover:underline">Все вопросы и ответы →</Link></p>
+        <p className="mt-5 text-sm"><Link href={`${b}/faq`} className="inline-flex min-h-10 items-center font-semibold text-neon hover:underline">Все вопросы и ответы →</Link></p>
       </Section>
 
       <section className="pb-16 pt-4 sm:pb-24">

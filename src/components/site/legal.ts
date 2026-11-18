@@ -35,12 +35,24 @@ function fillPlaceholders(md: string): string {
   return md.replace(/\{\{\s*([A-Z0-9_]+)\s*\}\}/g, (_, key: string) => env[key] || PLACEHOLDER);
 }
 
+/** Legal markdown links use short /legal/<doc> aliases; map them to real country routes. */
+function resolveLegalLinks(md: string, country: CP): string {
+  const target: Record<string, string> = {
+    privacy: "/ru/politika-konfidencialnosti",
+    "privacy-by": "/by/politika-konfidencialnosti",
+    terms: `/${country}/usloviya`,
+    consent: `/${country}/soglasie`,
+    cookies: `/${country}/cookies`,
+  };
+  return md.replace(/\]\(\/legal\/([a-z-]+)\)/g, (m, k: string) => (target[k] ? `](${target[k]})` : m));
+}
+
 /** Reads a legal document at build time; returns null when missing. */
 export async function loadLegal(kind: LegalKind, country: CP): Promise<string | null> {
   for (const name of fileFor(kind, country)) {
     try {
       const raw = await fs.readFile(path.join(process.cwd(), "src", "content", "legal", name), "utf8");
-      if (raw.trim()) return fillPlaceholders(raw.replace(/^\s*#\s+[^\n]*\n/, ""));
+      if (raw.trim()) return resolveLegalLinks(fillPlaceholders(raw.replace(/^\s*#\s+[^\n]*\n/, "")), country);
     } catch {
       /* try next */
     }

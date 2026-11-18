@@ -40,7 +40,9 @@ export const COUNTRY: Record<CountryCode, { currency: CurrencyCode; locale: stri
 
 export function formatMoney(minor: number, currency: CurrencyCode): string {
   const locale = currency === "RUB" ? "ru-RU" : "ru-BY";
-  return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: minor % 100 === 0 ? 0 : 2 }).format(minor / 100);
+  const out = new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: minor % 100 === 0 ? 0 : 2 }).format(minor / 100);
+  // ICU prints "Br" for BYN; use the ISO code everywhere for consistency with tools and invoices.
+  return currency === "BYN" ? out.replace(/\s?Br\b/u, "\u00a0BYN") : out;
 }
 
 export const ACTIVE_CUSTOMER_DAYS = 90; // a card is "active" if it had activity in the last 90 days

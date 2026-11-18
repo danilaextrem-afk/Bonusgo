@@ -53,9 +53,9 @@ export default function RootPage() {
       <footer className="border-t border-line">
         <div className="container-x flex flex-wrap gap-x-6 gap-y-2 py-6 text-xs text-muted">
           <span>© {new Date().getFullYear()} QRonus</span>
-          <Link href="/ru/politika-konfidencialnosti" className="hover:text-neon">Политика конфиденциальности</Link>
-          <Link href="/ru/usloviya" className="hover:text-neon">Условия</Link>
-          <Link href="/ru/cookies" className="hover:text-neon">Cookies</Link>
+          <Link href="/ru/politika-konfidencialnosti" className="inline-flex min-h-10 items-center hover:text-neon">Политика конфиденциальности</Link>
+          <Link href="/ru/usloviya" className="inline-flex min-h-10 items-center hover:text-neon">Условия</Link>
+          <Link href="/ru/cookies" className="inline-flex min-h-10 items-center hover:text-neon">Cookies</Link>
         </div>
       </footer>
       <JsonLd data={orgJsonLd()} />

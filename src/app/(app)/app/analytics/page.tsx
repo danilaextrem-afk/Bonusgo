@@ -21,7 +21,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         actions={
           <div className="flex gap-1">
             {[7, 30, 90].map((d) => (
-              <Link key={d} href={`/app/analytics?days=${d}`} className={`rounded-xl border px-3 py-1.5 text-sm ${d === days ? "border-neon text-neon" : "border-line text-muted"}`}>{d} дн.</Link>
+              <Link key={d} href={`/app/analytics?days=${d}`} className={`inline-flex min-h-10 items-center rounded-xl border px-3 text-sm ${d === days ? "border-neon text-neon" : "border-line text-muted"}`}>{d} дн.</Link>
             ))}
           </div>
         }

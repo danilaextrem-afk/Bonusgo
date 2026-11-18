@@ -23,7 +23,7 @@ export function CountrySwitch({ country, shared, staticPaths }: { country: CP; s
           href={target(c)}
           hrefLang={c === "ru" ? "ru-RU" : "ru-BY"}
           aria-current={c === country ? "true" : undefined}
-          className={`rounded-md px-2.5 py-1.5 font-medium transition ${c === country ? "bg-neon text-black" : "text-muted hover:text-neon"}`}
+          className={`inline-flex min-h-10 items-center rounded-md px-3 font-medium transition ${c === country ? "bg-neon text-black" : "text-muted hover:text-neon"}`}
         >
           {LABEL[c]}
         </Link>

@@ -46,7 +46,7 @@ export function CardBuilder({ country, shareable = true }: { country: CP; sharea
         </fieldset>
         <div>
           <label className="label" htmlFor="cb-stamps">Штампов до награды: {stamps}</label>
-          <input id="cb-stamps" type="range" min={5} max={12} step={1} value={stamps} onChange={(e) => set({ stamps: e.target.value })} className="w-full accent-[#39ff88]" />
+          <input id="cb-stamps" type="range" min={5} max={12} step={1} value={stamps} onChange={(e) => set({ stamps: e.target.value })} className="h-10 w-full accent-[#39ff88]" />
           <div className="flex justify-between text-xs text-muted" aria-hidden="true"><span>5</span><span>12</span></div>
         </div>
         <div>

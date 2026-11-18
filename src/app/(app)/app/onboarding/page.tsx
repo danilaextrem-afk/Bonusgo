@@ -17,7 +17,7 @@ const STEPS = ["Компания", "Заведение", "Программа", "
 
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
-  const { current } = await getAppContext();
+  const { current, user } = await getAppContext();
   const forceNew = sp1(sp.new) === "1";
 
   let step = 1;
@@ -45,7 +45,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
           <ActionForm action={createCompanyAction} className="space-y-4">
             <Field label="Название компании или бренда"><input className="input" name="name" required minLength={2} maxLength={80} placeholder="Кофейня «Зерно»" /></Field>
             <Field label="Страна">
-              <select className="input" name="country" defaultValue="RU">
+              <select className="input" name="country" defaultValue={user.country === "BY" ? "BY" : "RU"}>
                 <option value="RU">Россия</option>
                 <option value="BY">Беларусь</option>
               </select>

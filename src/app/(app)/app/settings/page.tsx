@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const { company, role, user } = await requireCompanyContext();
   const isOwner = role === "OWNER";
-  const refLink = `${appUrl()}/${COUNTRY[company.country].path}/?ref=${company.referralCode}`;
+  const refLink = `${appUrl()}/${COUNTRY[company.country].path}?ref=${company.referralCode}`;
   return (
     <>
       <PageHeader title="Настройки" />

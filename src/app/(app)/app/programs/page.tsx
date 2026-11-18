@@ -10,7 +10,7 @@ import { createProgramAction, createRewardAction, deactivateRewardAction, update
 export const dynamic = "force-dynamic";
 
 export default async function ProgramsPage() {
-  const { company, limits } = await requireCompanyContext();
+  const { company, limits, plan } = await requireCompanyContext();
   const [programs, rewards, venues, usage] = await Promise.all([listPrograms(company.id), listRewards(company.id), listVenues(company.id), getUsage(company.id)]);
   const venueName = new Map(venues.map((v) => [v.id, v.name]));
   const canAdd = venues.length > 0 && usage.programs < usage.limits.programs;
@@ -43,7 +43,7 @@ export default async function ProgramsPage() {
                     <Field label="Процент баллов"><input className="input" type="number" name="pointsPercent" min={1} max={50} defaultValue={p.pointsPercent} required /></Field>
                   )}
                   <Field label="Награда"><input className="input" name="rewardText" required minLength={2} maxLength={120} defaultValue={p.rewardText} /></Field>
-                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="active" defaultChecked={p.active} className="h-4 w-4 accent-[#39ff88]" /> Программа активна</label>
+                  <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" name="active" defaultChecked={p.active} className="h-4 w-4 accent-[#39ff88]" /> Программа активна</label>
                   <SubmitButton>Сохранить</SubmitButton>
                 </ActionForm>
 
@@ -61,7 +61,7 @@ export default async function ProgramsPage() {
                             <ActionForm action={deactivateRewardAction} confirm="Скрыть награду?">
                               <input type="hidden" name="companyId" value={company.id} />
                               <input type="hidden" name="rewardId" value={r.id} />
-                              <SubmitButton className="text-xs text-danger underline">Убрать</SubmitButton>
+                              <SubmitButton className="min-h-10 px-2 text-xs text-danger underline">Убрать</SubmitButton>
                             </ActionForm>
                           </li>
                         ))}
@@ -98,7 +98,7 @@ export default async function ProgramsPage() {
             </ActionForm>
           </div>
         ) : (
-          <PlanGate title="Достигнут лимит программ" need="TOP">На вашем тарифе доступно программ: {usage.limits.programs}.</PlanGate>
+          <PlanGate title="Достигнут лимит программ" need={plan === "FREE" ? "PRO" : "TOP"}>На вашем тарифе доступно программ: {usage.limits.programs}.</PlanGate>
         )}
       </div>
     </>

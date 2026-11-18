@@ -3,7 +3,7 @@ import { SubmitButton } from "@/components/app/SubmitButton";
 import { UsageBar } from "@/components/app/UsageBar";
 import { Notice, PLAN_NAMES, PageHeader, formatDate } from "@/components/app/ui";
 import { requireCompanyContext, sp1 } from "@/components/app/data";
-import { COUNTRY, PLAN_LIMITS, PLAN_PRICES, formatMoney, type PlanId } from "@/lib/plans";
+import { COUNTRY, PLAN_PRICES, formatMoney, type PlanId } from "@/lib/plans";
 import { getCsrfToken } from "@/server/auth/session";
 import { getUsage } from "@/server/limits";
 import { and, desc, eq } from "drizzle-orm";
@@ -64,7 +64,6 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                 <div className="mt-2 text-3xl font-extrabold glow-text">{formatMoney(price, cur)}<span className="text-sm font-normal text-muted"> / мес</span></div>
                 <ul className="my-4 space-y-1.5 text-sm text-muted">
                   {FEATURES[p].map((f) => <li key={f}>✓ {f}</li>)}
-                  <li>Лимит клиентов: {PLAN_LIMITS[p].activeCustomers}</li>
                 </ul>
                 {isOwner && !lower ? (
                   <form method="POST" action="/api/payments/checkout" className="mt-auto space-y-3">

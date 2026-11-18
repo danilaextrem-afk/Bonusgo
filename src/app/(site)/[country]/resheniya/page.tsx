@@ -41,7 +41,7 @@ export default async function Page({ params }: { params: Promise<{ country: stri
                 {pages.length > 0 && (
                   <ul className="mt-4 space-y-1.5 border-t border-line pt-4 text-sm">
                     {pages.map((p) => (
-                      <li key={p.slug}><Link href={pageHref(c, p)} className="text-neon hover:underline">{p.h1}</Link></li>
+                      <li key={p.slug}><Link href={pageHref(c, p)} className="inline-flex min-h-10 items-center text-neon hover:underline">{p.h1}</Link></li>
                     ))}
                   </ul>
                 )}

@@ -16,6 +16,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const role = sp1(sp.role) === "business" ? "business" : "customer";
   const country = sp1(sp.country) === "BY" ? "BY" : "RU";
+  const legal = country === "BY" ? "/by" : "/ru"; // documents differ by country (152-ФЗ vs 99-З)
   const ref = sp1(sp.ref) ?? "";
   const invite = sp1(sp.invite) ?? "";
   const next = safeNext(sp1(sp.next), "");
@@ -31,7 +32,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
     <Link
       href={`/register?role=${r}&${keep.toString()}`}
       aria-current={role === r ? "page" : undefined}
-      className={`flex-1 rounded-xl px-3 py-2 text-center text-sm font-medium ${role === r ? "bg-neon text-black" : "text-muted hover:text-text"}`}
+      className={`flex-1 rounded-xl px-3 py-2.5 text-center text-sm font-medium ${role === r ? "bg-neon text-black" : "text-muted hover:text-text"}`}
     >
       {label}
     </Link>
@@ -39,7 +40,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
 
   return (
     <main className="container-x flex min-h-dvh max-w-md flex-col justify-center py-10">
-      <Link href="/" className="mb-6 text-2xl font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
+      <Link href="/" className="mb-6 inline-flex min-h-10 items-center self-start text-2xl font-extrabold tracking-tight"><span className="glow-text">QR</span>onus</Link>
       <div className="card">
         <h1 className="mb-1 text-xl font-bold">Регистрация</h1>
         <p className="mb-4 text-sm text-muted">{role === "business" ? "Создайте бонусную карту для своего заведения." : "Копите бонусы в любимых заведениях."}</p>
@@ -64,20 +65,20 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
           </Field>
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" name="acceptTerms" required className="mt-1 h-4 w-4 accent-[#39ff88]" />
-            <span>Я принимаю <Link href="/ru/usloviya" className="text-neon underline underline-offset-4" target="_blank">Условия использования</Link></span>
+            <span>Я принимаю <Link href={`${legal}/usloviya`} className="text-neon underline underline-offset-4" target="_blank">Условия использования</Link></span>
           </label>
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" name="acceptPd" required className="mt-1 h-4 w-4 accent-[#39ff88]" />
             <span>
-              Даю <Link href="/ru/soglasie" className="text-neon underline underline-offset-4" target="_blank">согласие на обработку персональных данных</Link>{" "}
-              (<Link href="/ru/politika-konfidencialnosti" className="text-neon underline underline-offset-4" target="_blank">политика конфиденциальности</Link>)
+              Даю <Link href={`${legal}/soglasie`} className="text-neon underline underline-offset-4" target="_blank">согласие на обработку персональных данных</Link>{" "}
+              (<Link href={`${legal}/politika-konfidencialnosti`} className="text-neon underline underline-offset-4" target="_blank">политика конфиденциальности</Link>)
             </span>
           </label>
           <SubmitButton className="btn-primary w-full">Создать аккаунт</SubmitButton>
         </ActionForm>
       </div>
       <p className="mt-4 text-center text-sm text-muted">
-        Уже есть аккаунт? <Link className="text-neon underline underline-offset-4" href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}>Войти</Link>
+        Уже есть аккаунт? <Link className="inline-flex min-h-10 items-center text-neon underline underline-offset-4" href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}>Войти</Link>
       </p>
     </main>
   );

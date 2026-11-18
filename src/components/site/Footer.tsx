@@ -5,8 +5,8 @@ import { Logo } from "./Header";
 export function Footer({ country, owner }: { country: CP; owner?: string }) {
   const b = `/${country}`;
   const other = otherCountry(country);
-  const col = "space-y-2 text-sm";
-  const link = "text-muted hover:text-neon";
+  const col = "text-sm";
+  const link = "inline-flex min-h-10 items-center text-muted hover:text-neon";
   return (
     <footer className="mt-10 border-t border-line bg-surface/40">
       <div className="container-x grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-5">
@@ -15,7 +15,7 @@ export function Footer({ country, owner }: { country: CP; owner?: string }) {
           <p className="mt-3 text-sm leading-relaxed text-muted">Цифровые бонусные карты по QR для малого бизнеса в России и Беларуси.</p>
           <p className="mt-4 text-xs text-muted">
             Регион: <strong className="text-text">{countryName(country)}</strong> ·{" "}
-            <Link href={`/${other}`} hrefLang={other === "ru" ? "ru-RU" : "ru-BY"} className="text-neon hover:underline">{countryName(other)}</Link>
+            <Link href={`/${other}`} hrefLang={other === "ru" ? "ru-RU" : "ru-BY"} className="inline-flex min-h-10 items-center px-1 text-neon hover:underline">{countryName(other)}</Link>
           </p>
         </div>
         <nav aria-label="Продукт">

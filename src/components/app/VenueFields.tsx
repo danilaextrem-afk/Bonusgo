@@ -17,7 +17,7 @@ export function VenueFields({ canBrand, defaults }: { canBrand: boolean; default
         </>
       ) : (
         <p className="rounded-xl border border-line bg-surface-2 p-3 text-xs text-muted">
-          🔒 Свой цвет и логотип доступны на платных тарифах. <Link href="/app/billing" className="text-neon underline underline-offset-4">Улучшить тариф</Link>
+          🔒 Свой цвет и логотип доступны на платных тарифах. <Link href="/app/billing" className="inline-flex min-h-10 items-center text-neon underline underline-offset-4">Улучшить тариф</Link>
         </p>
       )}
     </div>

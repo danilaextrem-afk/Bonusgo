@@ -20,13 +20,13 @@ export function SbpClaims({ claims }: { claims: Claim[] }) {
       <ClaimList claims={pending} />
       {needsReceipt.length > 0 && (
         <details className="card" open>
-          <summary className="cursor-pointer text-sm font-semibold text-warn">Без чека: {needsReceipt.length}</summary>
+          <summary className="flex min-h-10 cursor-pointer items-center text-sm font-semibold text-warn">Без чека: {needsReceipt.length}</summary>
           <div className="mt-3"><ClaimList claims={needsReceipt} /></div>
         </details>
       )}
       {rest.length > 0 && (
         <details className="card">
-          <summary className="cursor-pointer text-sm text-muted">Обработанные: {rest.length}</summary>
+          <summary className="flex min-h-10 cursor-pointer items-center text-sm text-muted">Обработанные: {rest.length}</summary>
           <div className="mt-3"><ClaimList claims={rest} /></div>
         </details>
       )}
