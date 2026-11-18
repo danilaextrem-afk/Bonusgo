@@ -10,6 +10,8 @@ import { ACTIVE_CUSTOMER_DAYS, PLAN_LIMITS, type PlanId, type PlanLimits } from 
 /** The YDB client or a transaction (`sql.begin` callback arg): checks run inside the caller's tx. */
 type Q = SQL;
 type Row = Record<string, unknown>;
+/** `sql.begin` wraps non-retryable errors (incl. our AppErrors) as Error("Transaction failed.", { cause }): unwrap. */
+const unwrapTx = (e: unknown): unknown => (e instanceof Error && e.message === "Transaction failed." && e.cause !== undefined ? e.cause : e);
 const conn = async (q?: Q): Promise<Q> => q ?? (await ydb());
 
 /** Paid plan whose period has ended falls back to FREE. A paid plan with no expiry is treated as active. */
@@ -173,5 +175,7 @@ export async function withLimitLock<T>(companyId: string, resource: string, fn: 
   void companyId;
   void resource;
   const sql = await ydb();
-  return sql.begin((tx) => fn(tx as LimitTx));
+  return sql.begin((tx) => fn(tx as LimitTx)).catch((e) => {
+    throw unwrapTx(e);
+  });
 }

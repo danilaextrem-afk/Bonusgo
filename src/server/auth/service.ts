@@ -26,6 +26,8 @@ const registerSchema = z.object({
   invitedByCode: z.string().trim().max(64).optional(),
 });
 
+/** `sql.begin` wraps non-retryable errors (incl. our AppErrors) as Error("Transaction failed.", { cause }): unwrap. */
+const unwrapTx = (e: unknown): unknown => (e instanceof Error && e.message === "Transaction failed." && e.cause !== undefined ? e.cause : e);
 const emailTaken = () => new AppError("EMAIL_TAKEN", "Этот email уже зарегистрирован. Войдите в аккаунт.", 409);
 
 /** User (deleted ones included) by email via the users_by_email lookup table. */
@@ -62,7 +64,8 @@ export async function registerUser(input: {
                (${createId()}, ${user.id}, ${"terms"}, ${CONSENT_VERSION}, ${now}),
                (${createId()}, ${user.id}, ${"pd_processing"}, ${CONSENT_VERSION}, ${now})`;
     });
-  } catch (e) {
+  } catch (err) {
+    const e = unwrapTx(err);
     if (isDuplicate(e)) throw emailTaken();
     throw e;
   }
@@ -104,6 +107,8 @@ export async function deleteUserData(userId: string): Promise<void> {
              password_hash = ${randomHash}, deleted_at = ${optDate(nowSec())} WHERE id = ${userId}`;
     await tx`DELETE FROM sessions WHERE user_id = ${userId}`;
     await tx`DELETE FROM customer_tokens WHERE user_id = ${userId}`;
+  }).catch((e) => {
+    throw unwrapTx(e);
   });
   await audit("user.delete_data", { actorUserId: userId });
 }

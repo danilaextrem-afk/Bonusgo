@@ -14,6 +14,9 @@ const TTL_MIN = 30;
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 const appUrl = (p: string) => (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "") + p;
 
+/** `sql.begin` wraps non-retryable errors (incl. our AppErrors) as Error("Transaction failed.", { cause }): unwrap. */
+const unwrapTx = (e: unknown): unknown => (e instanceof Error && e.message === "Transaction failed." && e.cause !== undefined ? e.cause : e);
+
 export const passwordResetAvailable = emailConfigured;
 
 /**
@@ -67,6 +70,8 @@ export async function resetPassword(token: string, newPassword: string): Promise
     // Marks this link used; other outstanding links for this user stop working too.
     await tx`UPDATE password_resets SET used_at = ${now} WHERE user_id = ${uid} AND used_at IS NULL`;
     return uid;
+  }).catch((e) => {
+    throw unwrapTx(e);
   });
   await audit("auth.password_reset", { actorUserId: userId });
 }
