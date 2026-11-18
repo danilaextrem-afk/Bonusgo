@@ -22,14 +22,12 @@ body { background: var(--color-bg); color: var(--color-text); font-family: var(-
 :focus-visible { outline: 2px solid var(--color-neon); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
-@layer components {
-  .container-x { @apply mx-auto w-full max-w-6xl px-4 sm:px-6; }
-  .card { @apply rounded-[18px] border border-line bg-surface p-5; }
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none; }
-  .btn-primary { @apply btn bg-neon text-black hover:bg-neon-dim shadow-[0_0_24px_rgba(57,255,136,0.25)]; }
-  .btn-ghost { @apply btn border border-line text-text hover:border-neon/60 hover:text-neon; }
-  .input { @apply w-full rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm text-text placeholder:text-muted focus:border-neon focus:outline-none; }
-  .label { @apply mb-1 block text-xs font-medium uppercase tracking-wide text-muted; }
-  .badge { @apply inline-flex items-center rounded-full border border-neon/40 bg-neon/10 px-2.5 py-0.5 text-xs font-medium text-neon; }
-  .glow-text { @apply text-neon drop-shadow-[0_0_18px_rgba(57,255,136,0.45)]; }
-}
+@utility container-x { @apply mx-auto w-full max-w-6xl px-4 sm:px-6; }
+@utility card { @apply rounded-[18px] border border-line bg-surface p-5; }
+@utility btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50; }
+@utility btn-primary { @apply btn bg-neon text-black shadow-[0_0_24px_rgba(57,255,136,0.25)] hover:bg-neon-dim; }
+@utility btn-ghost { @apply btn border border-line text-text hover:border-neon/60 hover:text-neon; }
+@utility input { @apply w-full rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm text-text placeholder:text-muted focus:border-neon focus:outline-none; }
+@utility label { @apply mb-1 block text-xs font-medium tracking-wide text-muted uppercase; }
+@utility badge { @apply inline-flex items-center rounded-full border border-neon/40 bg-neon/10 px-2.5 py-0.5 text-xs font-medium text-neon; }
+@utility glow-text { @apply text-neon drop-shadow-[0_0_18px_rgba(57,255,136,0.45)]; }

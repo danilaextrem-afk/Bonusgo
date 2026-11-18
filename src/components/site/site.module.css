@@ -1,0 +1,84 @@
+.card {
+  --accent: #39ff88;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid #2c3236;
+  background:
+    radial-gradient(120% 80% at 100% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+    linear-gradient(160deg, #1b2024, #101315);
+  padding: 18px;
+  color: #e8ecee;
+}
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--accent);
+  opacity: 0.9;
+}
+.grid {
+  display: grid;
+  gap: 10px;
+}
+.stamp {
+  display: flex;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1.5px dashed #3a4147;
+  color: #4b545b;
+  background: transparent;
+}
+.filled {
+  border: 1.5px solid var(--accent);
+  border-style: solid;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.anim {
+  animation: stampCycle 11s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.6s);
+  animation-fill-mode: backwards;
+}
+@keyframes stampCycle {
+  0%, 2% {
+    border: 1.5px dashed #3a4147; color: #4b545b; background: transparent; box-shadow: none; transform: scale(1);
+  }
+  7% { transform: scale(1.18); }
+  11%, 86% {
+    border: 1.5px solid var(--accent); color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 35%, transparent); transform: scale(1);
+  }
+  95%, 100% {
+    border: 1.5px dashed #3a4147; color: #4b545b; background: transparent; box-shadow: none; transform: scale(1);
+  }
+}
+.float { animation: floaty 7s ease-in-out infinite; }
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.glow { animation: glowPulse 6s ease-in-out infinite; }
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
+}
+.pop { animation: popIn 0.5s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes popIn {
+  0% { transform: scale(0.6); opacity: 0.4; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.rise { animation: rise 0.7s ease-out both; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim, .float, .glow, .pop, .rise { animation: none !important; }
+}
