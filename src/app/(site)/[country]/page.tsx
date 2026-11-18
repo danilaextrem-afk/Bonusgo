@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ country: 
   return buildMetadata({
     country: c,
     path: "",
-    title: "Цифровые бонусные карты по QR для бизнеса",
+    title: c === "by" ? "Бонусные карты по QR для бизнеса в Беларуси" : "Цифровые бонусные карты по QR для бизнеса в России",
     description: `Бонусная карта для кофеен, барбершопов, салонов и автомоек: ${countryName(c)}. Без приложения, начисление подтверждает сотрудник. Бесплатный тариф.`,
   });
 }
