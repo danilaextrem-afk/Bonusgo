@@ -8,6 +8,7 @@ import {
   getPlatformStats, getPublicProgramByVenueSlug, issueCustomerToken, joinProgram, listCustomers, listTransactions, redeem,
 } from "@/server/loyalty/service";
 import { effectivePlan, getUsage, assertFeature } from "@/server/limits";
+import { auditCompanyLedger } from "@/server/loyalty/ledger-audit";
 import { getUserCompanies, requireMembership } from "@/server/tenancy";
 import { createSession } from "@/server/auth/session";
 import { ForbiddenError, LimitError } from "@/server/errors";
@@ -362,5 +363,54 @@ describe("referrals & platform stats", () => {
     expect(st.RU.paidCompanies).toBe(2);
     expect(st.total.companies).toBe(5);
     expect(st.funnel).toHaveProperty("organic_visits");
+  });
+});
+
+describe("read-only ledger reconciliation", () => {
+  it("matches normal operations, detects balance corruption, and never repairs automatically", async () => {
+    const setup = await makeSetup({ stampsRequired: 3 });
+    const customer = await makeUser();
+    const op = { actorUserId: setup.owner.id, companyId: setup.company.id, programId: setup.program.id };
+    expect(await auditCompanyLedger(setup.company.id)).toEqual({
+      companyId: setup.company.id, cardsChecked: 0, discrepancies: [],
+    });
+
+    await accrue({ ...op, customerToken: await qr(customer.id), stamps: 4, idempotencyKey: key() });
+    await redeem({ ...op, customerToken: await qr(customer.id), idempotencyKey: key() });
+    expect(await auditCompanyLedger(setup.company.id)).toEqual({
+      companyId: setup.company.id, cardsChecked: 1, discrepancies: [],
+    });
+
+    const [card] = await db.select().from(schema.cards).where(eq(schema.cards.customerId, customer.id));
+    await db.update(schema.cards).set({ balance: 9 }).where(eq(schema.cards.id, card.id));
+    const report = await auditCompanyLedger(setup.company.id);
+    expect(report).toEqual({
+      companyId: setup.company.id,
+      cardsChecked: 1,
+      discrepancies: [{ cardId: card.id, storedBalance: 9, ledgerBalance: 1, foreignTenantTransactions: 0 }],
+    });
+    const [unchanged] = await db.select().from(schema.cards).where(eq(schema.cards.id, card.id));
+    expect(unchanged.balance).toBe(9); // Audit is intentionally read-only.
+  });
+
+  it("flags a transaction attributed to the wrong tenant even if balances match", async () => {
+    const a = await makeSetup();
+    const b = await makeSetup();
+    const customer = await makeUser();
+    await accrue({
+      actorUserId: a.owner.id, companyId: a.company.id, programId: a.program.id,
+      customerToken: await qr(customer.id), idempotencyKey: key(),
+    });
+    const [transaction] = await db.select().from(schema.transactions);
+    await db.update(schema.transactions)
+      .set({ companyId: b.company.id })
+      .where(eq(schema.transactions.id, transaction.id));
+
+    const report = await auditCompanyLedger(a.company.id);
+    expect(report.discrepancies).toHaveLength(1);
+    expect(report.discrepancies[0]).toMatchObject({
+      storedBalance: 1, ledgerBalance: 1, foreignTenantTransactions: 1,
+    });
+    expect((await auditCompanyLedger(b.company.id)).cardsChecked).toBe(0);
   });
 });
