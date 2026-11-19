@@ -3,7 +3,7 @@ import { PLAN_LIMITS, type PlanId } from "@/lib/plans";
 import { AppError } from "@/server/errors";
 import { getCurrentUser } from "@/server/auth/session";
 import { effectivePlan } from "@/server/limits";
-import { exportCompanyCsv } from "@/server/loyalty/service";
+import { exportCompanyCsv, exportCompanyTransactionsCsv } from "@/server/loyalty/service";
 import { rateLimit } from "@/server/security/rateLimit";
 import { requireMembership } from "@/server/tenancy";
 
@@ -19,17 +19,25 @@ export async function GET(req: Request) {
     if (!user) return err(401, "UNAUTHORIZED", "Войдите в аккаунт.");
     const rl = await rateLimit(`export:${user.id}`, 10, 60);
     if (!rl.ok) return err(429, "RATE_LIMITED", "Слишком часто. Повторите позже.");
-    const companyId = z.string().min(1).max(64).safeParse(new URL(req.url).searchParams.get("companyId"));
+    const params = new URL(req.url).searchParams;
+    const companyId = z.string().min(1).max(64).safeParse(params.get("companyId"));
     if (!companyId.success) return err(400, "VALIDATION", "Не указана компания.");
+    const kind = params.get("kind") ?? "cards";
+    if (kind !== "cards" && kind !== "transactions")
+      return err(400, "VALIDATION", "Неизвестный тип экспорта.");
+
     const { company } = await requireMembership(companyId.data, ["OWNER", "MANAGER"]);
     const plan = (await effectivePlan(company)) as PlanId;
     if (!PLAN_LIMITS[plan].export) return err(402, "PLAN_LIMIT", "Экспорт доступен на тарифе TOP.");
-    const csv = await exportCompanyCsv(company.id);
-    return new Response("﻿" + csv, {
+    const csv = kind === "transactions"
+      ? await exportCompanyTransactionsCsv(company.id)
+      : await exportCompanyCsv(company.id);
+    return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="qronus-${new Date().toISOString().slice(0, 10)}.csv"`,
+        "Content-Disposition": `attachment; filename="qronus-${kind}-${new Date().toISOString().slice(0, 10)}.csv"`,
         "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (e) {
