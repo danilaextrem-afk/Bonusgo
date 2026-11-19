@@ -115,7 +115,12 @@ export const cards = pgTable("cards", {
   balance: integer("balance").notNull().default(0),
   lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: created(),
-}, (t) => [uniqueIndex("cards_program_customer").on(t.programId, t.customerId), index("cards_company_idx").on(t.companyId)]);
+}, (t) => [
+  uniqueIndex("cards_program_customer").on(t.programId, t.customerId),
+  index("cards_company_idx").on(t.companyId),
+  // Both the wallet and full history begin by resolving a user's cards.
+  index("cards_customer_idx").on(t.customerId),
+]);
 
 /** Short-lived one-time token shown as the customer's QR; staff scans it to accrue/redeem. */
 export const customerTokens = pgTable("customer_tokens", {
