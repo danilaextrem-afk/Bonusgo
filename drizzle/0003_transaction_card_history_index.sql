@@ -1,0 +1,1 @@
+CREATE INDEX "tx_card_history_idx" ON "transactions" USING btree ("card_id", "created_at" DESC NULLS FIRST, "id" DESC NULLS FIRST);
