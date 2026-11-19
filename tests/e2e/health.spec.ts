@@ -32,3 +32,21 @@ test("version endpoint is a side-effect-free, non-cached deployment probe", asyn
   }
   expect(await first.json()).toEqual(await second.json());
 });
+
+
+test("Render liveness endpoint is public, tiny and never caches", async ({ request }) => {
+  const response = await request.get("/api/live");
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toEqual({ ok: true });
+  expect(response.headers()["cache-control"]).toContain("no-store");
+  expect(response.headers()["x-robots-tag"]).toContain("noindex");
+});
+
+test("database readiness is independent of Render process liveness", async ({ request }) => {
+  // CI supplies a dedicated PostgreSQL service and applies its migrations.
+  const response = await request.get("/api/ready");
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toEqual({ ok: true });
+  expect(response.headers()["cache-control"]).toContain("no-store");
+  expect(response.headers()["x-robots-tag"]).toContain("noindex");
+});
