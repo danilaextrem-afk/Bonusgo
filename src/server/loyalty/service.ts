@@ -528,8 +528,11 @@ export async function getCustomerCards(userId: string) {
   const [rws, txs] = await Promise.all([
     db.select().from(schema.rewards).where(and(inArray(schema.rewards.programId, programIds), eq(schema.rewards.active, true))).orderBy(asc(schema.rewards.cost)),
     db.execute(sql`SELECT id, card_id, type, amount, created_at FROM (
-        SELECT t.*, row_number() OVER (PARTITION BY card_id ORDER BY created_at DESC) rn FROM transactions t WHERE card_id IN ${cardIds}
-      ) x WHERE rn <= 20 ORDER BY created_at DESC`),
+        SELECT t.id, t.card_id, t.type, t.amount, t.created_at,
+               row_number() OVER (PARTITION BY t.card_id ORDER BY t.created_at DESC, t.id DESC) AS rn
+        FROM transactions t
+        WHERE t.card_id IN (${sql.join(cardIds.map((id) => sql`${id}`), sql`, `)})
+      ) x WHERE rn <= 20 ORDER BY created_at DESC, id DESC`),
   ]);
   const txRows = txs.rows as { id: string; card_id: string; type: string; amount: number; created_at: string | Date }[];
   return rows.map((r) => ({
