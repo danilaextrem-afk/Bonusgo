@@ -411,16 +411,34 @@ export async function listTransactions(companyId: string, o: { cardId?: string; 
   const conds = [eq(schema.transactions.companyId, companyId)];
   if (o.cardId) conds.push(eq(schema.transactions.cardId, o.cardId));
   const where = and(...conds);
+
+  // Defense in depth: legacy or corrupted rows must not mix transaction,
+  // card and program tenants. Use identical joins for items and total.
+  const cardJoin = and(
+    eq(schema.cards.id, schema.transactions.cardId),
+    eq(schema.cards.companyId, schema.transactions.companyId),
+  );
+  const programJoin = and(
+    eq(schema.programs.id, schema.cards.programId),
+    eq(schema.programs.companyId, schema.cards.companyId),
+  );
+
   const [items, totalR] = await Promise.all([
     db.select({
       id: schema.transactions.id, cardId: schema.transactions.cardId, type: schema.transactions.type, amount: schema.transactions.amount,
       purchaseMinor: schema.transactions.purchaseMinor, note: schema.transactions.note, staffUserId: schema.transactions.staffUserId, createdAt: schema.transactions.createdAt,
       programName: schema.programs.name,
     }).from(schema.transactions)
-      .innerJoin(schema.cards, eq(schema.cards.id, schema.transactions.cardId))
-      .innerJoin(schema.programs, eq(schema.programs.id, schema.cards.programId))
-      .where(where).orderBy(desc(schema.transactions.createdAt)).limit(lim(o.limit, 50, 500)).offset(off(o.offset)),
-    db.select({ n: count() }).from(schema.transactions).where(where),
+      .innerJoin(schema.cards, cardJoin)
+      .innerJoin(schema.programs, programJoin)
+      .where(where)
+      .orderBy(desc(schema.transactions.createdAt), desc(schema.transactions.id))
+      .limit(lim(o.limit, 50, 500)).offset(off(o.offset)),
+    db.select({ n: count() })
+      .from(schema.transactions)
+      .innerJoin(schema.cards, cardJoin)
+      .innerJoin(schema.programs, programJoin)
+      .where(where),
   ]);
   return { items, total: Number(totalR[0]?.n ?? 0) };
 }
