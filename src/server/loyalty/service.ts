@@ -438,15 +438,24 @@ export async function listCustomers(companyId: string, o: { q?: string; limit: n
     conds.push(or(ilike(schema.users.name, pat), ilike(schema.users.email, pat))!);
   }
   const where = and(...conds);
+  // A card's linked program must belong to the SAME business. Apply the
+  // same joins to both the visible rows and the pagination total.
+  const matchingProgram = and(
+    eq(schema.programs.id, schema.cards.programId),
+    eq(schema.programs.companyId, schema.cards.companyId),
+  );
   const base = () => db.select({
     cardId: schema.cards.id, customerName: schema.users.name, email: schema.users.email, programName: schema.programs.name, programType: schema.programs.type,
     balance: schema.cards.balance, lastActivityAt: schema.cards.lastActivityAt, createdAt: schema.cards.createdAt,
   }).from(schema.cards)
     .innerJoin(schema.users, eq(schema.users.id, schema.cards.customerId))
-    .innerJoin(schema.programs, eq(schema.programs.id, schema.cards.programId));
+    .innerJoin(schema.programs, matchingProgram);
   const [rows, totalR] = await Promise.all([
-    base().where(where).orderBy(desc(schema.cards.lastActivityAt)).limit(lim(o.limit, 50, 200)).offset(off(o.offset)),
-    db.select({ n: count() }).from(schema.cards).innerJoin(schema.users, eq(schema.users.id, schema.cards.customerId)).where(where),
+    base().where(where).orderBy(desc(schema.cards.lastActivityAt), desc(schema.cards.id)).limit(lim(o.limit, 50, 200)).offset(off(o.offset)),
+    db.select({ n: count() }).from(schema.cards)
+      .innerJoin(schema.users, eq(schema.users.id, schema.cards.customerId))
+      .innerJoin(schema.programs, matchingProgram)
+      .where(where),
   ]);
   const items = rows.map(({ email, ...r }) => ({ ...r, customerName: r.customerName ?? "", customerEmailMasked: maskEmail(email), customerEmail: maskEmail(email) }));
   return { items, total: Number(totalR[0]?.n ?? 0) };
@@ -527,8 +536,11 @@ export async function exportCompanyCsv(companyId: string, period?: string | null
     balance: schema.cards.balance, createdAt: schema.cards.createdAt, lastActivityAt: schema.cards.lastActivityAt,
   }).from(schema.cards)
     .innerJoin(schema.users, eq(schema.users.id, schema.cards.customerId))
-    .innerJoin(schema.programs, eq(schema.programs.id, schema.cards.programId))
-        .where(and(
+    .innerJoin(schema.programs, and(
+      eq(schema.programs.id, schema.cards.programId),
+      eq(schema.programs.companyId, schema.cards.companyId),
+    ))
+    .where(and(
       eq(schema.cards.companyId, companyId),
       window ? gte(schema.cards.createdAt, window.from) : undefined,
       window ? lt(schema.cards.createdAt, window.until) : undefined,
@@ -560,7 +572,17 @@ export async function exportCompanyTransactionsCsv(companyId: string, period?: s
     note: schema.transactions.note,
     createdAt: schema.transactions.createdAt,
   }).from(schema.transactions)
-        .where(and(
+    // Never export a transaction if its company conflicts with its card or
+    // the card's program (including incorrectly linked historical rows).
+    .innerJoin(schema.cards, and(
+      eq(schema.cards.id, schema.transactions.cardId),
+      eq(schema.cards.companyId, schema.transactions.companyId),
+    ))
+    .innerJoin(schema.programs, and(
+      eq(schema.programs.id, schema.cards.programId),
+      eq(schema.programs.companyId, schema.cards.companyId),
+    ))
+    .where(and(
       eq(schema.transactions.companyId, companyId),
       window ? gte(schema.transactions.createdAt, window.from) : undefined,
       window ? lt(schema.transactions.createdAt, window.until) : undefined,
