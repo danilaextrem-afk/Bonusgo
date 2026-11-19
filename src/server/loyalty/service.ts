@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNull, like, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, ilike, inArray, isNull, like, lt, or, sql } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { AppError, ForbiddenError, LimitError, NotFoundError } from "@/server/errors";
 import { audit } from "@/server/audit";
