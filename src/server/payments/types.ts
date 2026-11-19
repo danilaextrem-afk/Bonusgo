@@ -32,7 +32,7 @@ export interface PaymentProvider {
   /** True only when real money can move (credentials present AND live switch on). */
   isLive(): boolean;
   isConfigured(): boolean;
-  createCheckout(payment: PaymentRow, company: CompanyRow): Promise<{ redirectUrl: string }> | { redirectUrl: string };
+  createCheckout(payment: PaymentRow, company: CompanyRow, payer?: { id: string; email: string }): Promise<{ redirectUrl: string }> | { redirectUrl: string };
   verifyNotification(input: NotificationInput): VerifiedNotification;
 }
 
