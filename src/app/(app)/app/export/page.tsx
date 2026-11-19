@@ -11,8 +11,19 @@ export default async function ExportPage() {
       <PageHeader title="Экспорт данных" />
       {limits.export ? (
         <div className="card space-y-3">
-          <p className="text-sm text-muted">Скачайте клиентов и операции в формате CSV — файл откроется в Excel и Google Таблицах.</p>
-          <a className="btn-primary" href={`/api/app/export?companyId=${encodeURIComponent(company.id)}`} download>Скачать CSV</a>
+          <p className="text-sm text-muted">
+            Скачайте отдельно бонусные карты клиентов и историю начислений и списаний.
+            Файлы CSV открываются в Excel и Google Таблицах.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <a className="btn-primary" href={`/api/app/export?companyId=${encodeURIComponent(company.id)}&kind=cards`} download>
+              Скачать карты
+            </a>
+            <a className="btn-secondary" href={`/api/app/export?companyId=${encodeURIComponent(company.id)}&kind=transactions`} download>
+              Скачать операции
+            </a>
+          </div>
+          <p className="text-xs text-muted">До 50 000 строк на файл. Если данных больше, выгрузка завершится ошибкой без потери записей.</p>
         </div>
       ) : (
         <PlanGate title="Экспорт в CSV" need="TOP">Выгрузка клиентов и операций для вашей бухгалтерии и CRM.</PlanGate>
