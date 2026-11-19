@@ -4,6 +4,7 @@ import { AppError } from "@/server/errors";
 import { getCurrentUser } from "@/server/auth/session";
 import { effectivePlan } from "@/server/limits";
 import { exportCompanyCsv, exportCompanyTransactionsCsv } from "@/server/loyalty/service";
+import { parseExportPeriod } from "@/server/loyalty/export-period";
 import { rateLimit } from "@/server/security/rateLimit";
 import { requireMembership } from "@/server/tenancy";
 
@@ -25,17 +26,18 @@ export async function GET(req: Request) {
     const kind = params.get("kind") ?? "cards";
     if (kind !== "cards" && kind !== "transactions")
       return err(400, "VALIDATION", "Неизвестный тип экспорта.");
+    const period = parseExportPeriod(params.get("period"));
 
     const { company } = await requireMembership(companyId.data, ["OWNER", "MANAGER"]);
     const plan = (await effectivePlan(company)) as PlanId;
     if (!PLAN_LIMITS[plan].export) return err(402, "PLAN_LIMIT", "Экспорт доступен на тарифе TOP.");
     const csv = kind === "transactions"
-      ? await exportCompanyTransactionsCsv(company.id)
-      : await exportCompanyCsv(company.id);
+      ? await exportCompanyTransactionsCsv(company.id, period?.label)
+      : await exportCompanyCsv(company.id, period?.label);
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="qronus-${kind}-${new Date().toISOString().slice(0, 10)}.csv"`,
+        "Content-Disposition": `attachment; filename="qronus-${kind}-${period?.label ?? new Date().toISOString().slice(0, 10)}.csv"`,
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
       },
