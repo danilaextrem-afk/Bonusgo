@@ -3,9 +3,14 @@ on:
   push:
     branches: [main]
   pull_request:
+# Keep only the newest run per branch/PR to avoid concurrent Chromium downloads.
+concurrency:
+  group: qronus-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16
