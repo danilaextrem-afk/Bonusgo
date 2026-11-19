@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { desc, eq, inArray } from "drizzle-orm";
 import { InstallBanner } from "@/components/app/InstallBanner";
 import { CopyButton } from "@/components/app/CopyButton";
 import { StampGrid } from "@/components/app/StampGrid";
@@ -7,26 +6,19 @@ import { Empty, PageHeader, formatDate } from "@/components/app/ui";
 import { asArray, pNum, pStr, pick, rec } from "@/components/app/adapt";
 import { appUrl } from "@/components/app/safe";
 import { requireUser } from "@/server/auth/session";
-import { db, schema } from "@/server/db";
 import { getCustomerCards } from "@/server/loyalty/service";
+import { walletHistoryPreview } from "@/server/loyalty/wallet-preview";
 
 export const dynamic = "force-dynamic";
 const TYPE: Record<string, string> = { ACCRUE: "Начисление", REDEEM: "Списание награды", ADJUST: "Корректировка", REFERRAL_BONUS: "Бонус за приглашение" };
 
 export default async function MePage() {
   const user = await requireUser();
-  const cards = asArray(await getCustomerCards(user.id), "cards");
-  const cardIds = cards.map((c) => pStr(pick(c, "card") ?? c, "id")).filter(Boolean);
-  const history = cardIds.length
-    ? await db
-        .select({ id: schema.transactions.id, type: schema.transactions.type, amount: schema.transactions.amount, createdAt: schema.transactions.createdAt, program: schema.programs.name })
-        .from(schema.transactions)
-        .innerJoin(schema.cards, eq(schema.cards.id, schema.transactions.cardId))
-        .innerJoin(schema.programs, eq(schema.programs.id, schema.cards.programId))
-        .where(inArray(schema.transactions.cardId, cardIds))
-        .orderBy(desc(schema.transactions.createdAt))
-        .limit(15)
-    : [];
+  const customerCards = await getCustomerCards(user.id);
+  const cards = asArray(customerCards, "cards");
+  // The already loaded card histories are scoped to this customer and tenant.
+  // Avoid a second, less restrictive query for the 15-row overview.
+  const history = walletHistoryPreview(customerCards);
   const invite = `${appUrl()}/register?role=customer&invite=${user.inviteCode}`;
 
   return (
