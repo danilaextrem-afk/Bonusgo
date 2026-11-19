@@ -77,6 +77,18 @@ test("core user journey", async ({ browser, baseURL }, testInfo) => {
   await cp.goto("/me");
   await expect(cp.getByRole("img", { name: "Штампов: 1 из 5" })).toBeVisible();
 
+  // Full transaction history must be accessible to the customer, not
+  // silently limited to the 15 operations shown on the wallet overview.
+  await cp.getByRole("link", { name: "Вся история операций" }).click();
+  await expect(cp).toHaveURL(/\/me\/history$/);
+  await expect(cp.getByRole("heading", { name: "Все бонусные операции" })).toBeVisible();
+  await expect(cp.getByText("Начисление", { exact: true })).toBeVisible();
+  await expect(cp.getByText("+1", { exact: true })).toBeVisible();
+  await cp.goto("/me/history?cursor=invalid");
+  await expect(cp.getByRole("alert")).toContainText("Недействительная ссылка");
+  await cp.getByRole("link", { name: "Начать с первой страницы" }).click();
+  await expect(cp.getByText("Начисление", { exact: true })).toBeVisible();
+
   // 5. FREE gating
   await bp.goto("/app/programs");
   await expect(bp.getByText("Достигнут лимит программ")).toBeVisible();
@@ -118,6 +130,8 @@ test("core user journey", async ({ browser, baseURL }, testInfo) => {
   const ledgerDenied = await bp.goto("/admin/ledger");
   expect(ledgerDenied?.status()).toBe(404);
   await ap.goto("/admin/ledger");
+  await expect(ap).toHaveURL(/\/login/);
+  await ap.goto("/me/history");
   await expect(ap).toHaveURL(/\/login/);
 
   // 9. Mobile overflow
