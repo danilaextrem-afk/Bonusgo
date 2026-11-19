@@ -8,6 +8,7 @@ import { notifyOwner } from "@/server/notify";
 import { rateLimit } from "@/server/security/rateLimit";
 import { trackEvent } from "./analytics";
 import { MAX_EXPORT_ROWS, assertCompleteExport } from "./export-limits";
+import { parseExportPeriod } from "./export-period";
 import { assertCanAddProgram, assertCanAddStaff, assertCanAddVenue, assertFeature, assertOperationAllowed, brandingAllowed, effectivePlan, withLimitLock } from "@/server/limits";
 import { ACTIVE_CUSTOMER_DAYS, COUNTRY, PLAN_LIMITS, PLAN_PRICES, type CountryCode } from "@/lib/plans";
 import { MAX_PURCHASE_MINOR, computePoints, csvRow, isValidColor, isValidLogoUrl, maskEmail, parseCustomerToken, slugify } from "./utils";
@@ -455,15 +456,20 @@ export async function getCompanyAnalytics(companyId: string, days = 30) {
 
 /** CSV is generated entirely server-side after the caller's membership check.
  * Each export is tenant-filtered and refuses a silent partial download. */
-export async function exportCompanyCsv(companyId: string): Promise<string> {
+export async function exportCompanyCsv(companyId: string, period?: string | null): Promise<string> {
   await assertFeature(companyId, "export");
+  const window = parseExportPeriod(period);
   const rows = await db.select({
     cardId: schema.cards.id, name: schema.users.name, email: schema.users.email, program: schema.programs.name, type: schema.programs.type,
     balance: schema.cards.balance, createdAt: schema.cards.createdAt, lastActivityAt: schema.cards.lastActivityAt,
   }).from(schema.cards)
     .innerJoin(schema.users, eq(schema.users.id, schema.cards.customerId))
     .innerJoin(schema.programs, eq(schema.programs.id, schema.cards.programId))
-    .where(eq(schema.cards.companyId, companyId))
+        .where(and(
+      eq(schema.cards.companyId, companyId),
+      window ? gte(schema.cards.createdAt, window.from) : undefined,
+      window ? lt(schema.cards.createdAt, window.until) : undefined,
+    ))
     .orderBy(asc(schema.cards.createdAt), asc(schema.cards.id))
     .limit(MAX_EXPORT_ROWS + 1);
 
@@ -473,13 +479,14 @@ export async function exportCompanyCsv(companyId: string): Promise<string> {
     const deleted = r.email.endsWith("@deleted.invalid");
     lines.push(csvRow([r.cardId, deleted ? "" : r.name, deleted ? "" : r.email, r.program, r.type, r.balance, r.createdAt, r.lastActivityAt]));
   }
-  await audit("company.export_csv", { companyId, meta: { kind: "cards", rows: rows.length } });
+  await audit("company.export_csv", { companyId, meta: { kind: "cards", rows: rows.length, period: window?.label ?? null } });
   return "\uFEFF" + lines.join("\r\n") + "\r\n";
 }
 
 /** Signed loyalty transaction history: an independent CSV, not a card snapshot. */
-export async function exportCompanyTransactionsCsv(companyId: string): Promise<string> {
+export async function exportCompanyTransactionsCsv(companyId: string, period?: string | null): Promise<string> {
   await assertFeature(companyId, "export");
+  const window = parseExportPeriod(period);
   const rows = await db.select({
     id: schema.transactions.id,
     cardId: schema.transactions.cardId,
@@ -490,7 +497,11 @@ export async function exportCompanyTransactionsCsv(companyId: string): Promise<s
     note: schema.transactions.note,
     createdAt: schema.transactions.createdAt,
   }).from(schema.transactions)
-    .where(eq(schema.transactions.companyId, companyId))
+        .where(and(
+      eq(schema.transactions.companyId, companyId),
+      window ? gte(schema.transactions.createdAt, window.from) : undefined,
+      window ? lt(schema.transactions.createdAt, window.until) : undefined,
+    ))
     .orderBy(asc(schema.transactions.createdAt), asc(schema.transactions.id))
     .limit(MAX_EXPORT_ROWS + 1);
 
@@ -499,7 +510,7 @@ export async function exportCompanyTransactionsCsv(companyId: string): Promise<s
   for (const r of rows) {
     lines.push(csvRow([r.id, r.cardId, r.type, r.amount, r.purchaseMinor, r.staffUserId, r.note, r.createdAt]));
   }
-  await audit("company.export_csv", { companyId, meta: { kind: "transactions", rows: rows.length } });
+  await audit("company.export_csv", { companyId, meta: { kind: "transactions", rows: rows.length, period: window?.label ?? null } });
   return "\uFEFF" + lines.join("\r\n") + "\r\n";
 }
 
