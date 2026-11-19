@@ -535,8 +535,14 @@ export async function exportCompanyTransactionsCsv(companyId: string, period?: s
 export async function getCustomerCards(userId: string) {
   const rows = await db.select({ card: schema.cards, program: schema.programs, venue: schema.venues, companyName: schema.companies.name })
     .from(schema.cards)
-    .innerJoin(schema.programs, eq(schema.programs.id, schema.cards.programId))
-    .innerJoin(schema.venues, eq(schema.venues.id, schema.programs.venueId))
+    .innerJoin(schema.programs, and(
+      eq(schema.programs.id, schema.cards.programId),
+      eq(schema.programs.companyId, schema.cards.companyId),
+    ))
+    .innerJoin(schema.venues, and(
+      eq(schema.venues.id, schema.programs.venueId),
+      eq(schema.venues.companyId, schema.cards.companyId),
+    ))
     .innerJoin(schema.companies, eq(schema.companies.id, schema.cards.companyId))
     .where(and(eq(schema.cards.customerId, userId), isNull(schema.companies.deletedAt)))
     .orderBy(desc(schema.cards.lastActivityAt));
@@ -549,7 +555,10 @@ export async function getCustomerCards(userId: string) {
         SELECT t.id, t.card_id, t.type, t.amount, t.created_at,
                row_number() OVER (PARTITION BY t.card_id ORDER BY t.created_at DESC, t.id DESC) AS rn
         FROM transactions t
+        JOIN cards c ON c.id = t.card_id
         WHERE t.card_id IN (${sql.join(cardIds.map((id) => sql`${id}`), sql`, `)})
+          AND t.company_id = c.company_id
+          AND c.customer_id = ${userId}
       ) x WHERE rn <= 20 ORDER BY created_at DESC, id DESC`),
   ]);
   const txRows = txs.rows as { id: string; card_id: string; type: string; amount: number; created_at: string | Date }[];
