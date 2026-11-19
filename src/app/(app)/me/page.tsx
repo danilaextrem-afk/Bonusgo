@@ -81,6 +81,11 @@ export default async function MePage() {
             </ul>
           </div>
         )}
+        {cards.length > 0 && (
+          <div className="flex justify-end">
+            <Link href="/me/history" className="btn-secondary">Вся история операций</Link>
+          </div>
+        )}
 
         <div className="card">
           <h2 className="mb-1 font-semibold">Пригласите друзей</h2>
