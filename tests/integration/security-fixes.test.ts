@@ -105,6 +105,32 @@ describe("production hardening", () => {
     expect(after.plan).toBe("FREE");
   });
 
+  it("production admin email fallback is restricted to explicitly enabled GitHub E2E sandbox", () => {
+    const prevCi = process.env.CI;
+    const prevGitHub = process.env.GITHUB_ACTIONS;
+    try {
+      setEnv({
+        NODE_ENV: "production",
+        ALLOW_TEST_PAYMENTS: "true",
+        ADMIN_EMAILS: "unverified@example.test",
+        CI: "false",
+        GITHUB_ACTIONS: "false",
+      });
+      const u = { email: "unverified@example.test", platformRole: "USER" as const };
+      expect(isPlatformAdmin(u)).toBe(false);
+      setEnv({ CI: "true" });
+      expect(isPlatformAdmin(u)).toBe(false);
+      setEnv({ CI: "false", GITHUB_ACTIONS: "true" });
+      expect(isPlatformAdmin(u)).toBe(false);
+      setEnv({ CI: "true" });
+      expect(isPlatformAdmin(u)).toBe(true);
+      expect(isPlatformAdmin({ ...u, platformRole: "ADMIN" })).toBe(true);
+    } finally {
+      restore();
+      setEnv({ CI: prevCi, GITHUB_ACTIONS: prevGitHub });
+    }
+  });
+
   it("ADMIN_EMAILS grants nothing in production; only the DB role does", () => {
     setEnv({ NODE_ENV: "production", ADMIN_EMAILS: "boss@example.com" });
     expect(isPlatformAdmin({ email: "boss@example.com", platformRole: "USER" })).toBe(false);
