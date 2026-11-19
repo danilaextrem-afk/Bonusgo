@@ -96,7 +96,12 @@ export async function processNotification(providerId: ProviderId, parsed: Verifi
     const [sub] = await tx.select().from(schema.subscriptions).where(eq(schema.subscriptions.companyId, p.companyId)).orderBy(desc(schema.subscriptions.createdAt)).limit(1);
 
     if (parsed.kind === "paid") {
-      if (p.status !== "PENDING") return { ok: true, status: p.status, changed: false, companyId: p.companyId };
+      // Platega can confirm a transaction after CANCELED. Only allow reopening
+      // a payment previously failed by Platega's verified cancellation status.
+      // Never reopen provider errors, failed checkouts, or other payment methods.
+      const latePlategaConfirmation = providerId === "platega" && p.status === "FAILED" &&
+        (p.failReason === "platega_canceled" || p.failReason === "platega_expired");
+      if (p.status !== "PENDING" && !latePlategaConfirmation) return { ok: true, status: p.status, changed: false, companyId: p.companyId };
       if (p.testMode && !testPaymentsMayActivate()) {
         return { ok: true, status: p.status, changed: false, companyId: p.companyId, _companyId: p.companyId, _audit: ["error.test_payment_in_production", { invoiceNo: p.invoiceNo, provider: providerId }] };
       }
