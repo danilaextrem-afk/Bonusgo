@@ -1,6 +1,7 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/server/db";
+import { AppError } from "@/server/errors";
 
 /**
  * Read-only balance reconciliation intended for controlled internal audits.
@@ -20,6 +21,20 @@ export type CompanyLedgerAudit = {
   discrepancies: LedgerDiscrepancy[];
 };
 
+/** Hard cap prevents an admin query from loading unlimited cards into memory. */
+export const MAX_LEDGER_AUDIT_CARDS = 10_000;
+
+export function assertLedgerAuditCapacity(cardsChecked: number): void {
+  if (!Number.isSafeInteger(cardsChecked) || cardsChecked < 0)
+    throw new RangeError("Invalid card count in ledger reconciliation");
+  if (cardsChecked > MAX_LEDGER_AUDIT_CARDS)
+    throw new AppError(
+      "AUDIT_TOO_LARGE",
+      "Слишком много карт для одной проверки. Используйте пакетную сверку.",
+      413,
+    );
+}
+
 export async function auditCompanyLedger(companyId: string): Promise<CompanyLedgerAudit> {
   if (!companyId || typeof companyId !== "string")
     throw new TypeError("companyId is required");
@@ -36,7 +51,11 @@ export async function auditCompanyLedger(companyId: string): Promise<CompanyLedg
     .from(schema.cards)
     .leftJoin(schema.transactions, eq(schema.transactions.cardId, schema.cards.id))
     .where(eq(schema.cards.companyId, companyId))
-    .groupBy(schema.cards.id, schema.cards.balance);
+    .groupBy(schema.cards.id, schema.cards.balance)
+    // Never return a deceptively clean partial report if the company is too large.
+    .limit(MAX_LEDGER_AUDIT_CARDS + 1);
+
+  assertLedgerAuditCapacity(rows.length);
 
   const discrepancies: LedgerDiscrepancy[] = [];
   for (const row of rows) {
