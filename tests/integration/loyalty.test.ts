@@ -169,7 +169,7 @@ describe("operations", () => {
       .rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT", status: 409 });
 
     // A genuine retry of the same actor/action/program remains idempotent.
-    const replay = await accrue({ ...base, customerToken: originalToken, idempotencyKey: sameKey });
+    const replay = await accrue({ ...base, customerToken: originalToken, stamps: 3, idempotencyKey: sameKey });
     expect(replay.duplicated).toBe(true);
     expect(replay.transaction.id).toBe(first.transaction.id);
     expect(replay.card.balance).toBe(3);
