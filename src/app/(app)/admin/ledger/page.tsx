@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePlatformAdmin } from "@/server/auth/session";
 import { runAdminLedgerAudit } from "@/server/loyalty/admin-ledger";
@@ -35,7 +36,7 @@ export default async function LedgerAdminPage({
 
   return (
     <main className="container-x py-6">
-      <a href="/admin" className="text-sm text-muted underline">Вернуться в админ-панель</a>
+      <Link href="/admin" className="text-sm text-muted underline">Вернуться в админ-панель</Link>
       <h1 className="mt-4 text-2xl font-bold">Сверка бонусных балансов</h1>
       <p className="my-3 text-sm text-muted">
         Только для администратора платформы. Проверка читает базу данных и не меняет балансы.
