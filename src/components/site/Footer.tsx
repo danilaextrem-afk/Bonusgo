@@ -58,7 +58,7 @@ export function Footer({ country, owner }: { country: CP; owner?: string }) {
       <div className="border-t border-line">
         <div className="container-x flex flex-col gap-1 py-5 text-xs text-muted sm:flex-row sm:justify-between">
           <p>© {new Date().getFullYear()} QRonus{owner ? ` · ${owner}` : ""}</p>
-          <p>Демо-примеры на сайте носят иллюстративный характер.</p>
+          <p>Демо-примеры на сайте носят иллюстративный характер. <span className="ml-2" data-provider-verification="platega">Код проверки: verplatega</span></p>
         </div>
       </div>
     </footer>
