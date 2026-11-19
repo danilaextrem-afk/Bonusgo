@@ -6,6 +6,7 @@ import { audit } from "@/server/audit";
 import { AppError, ForbiddenError, NotFoundError } from "@/server/errors";
 import { rateLimit } from "@/server/security/rateLimit";
 import { auditCompanyLedger, type CompanyLedgerAudit } from "./ledger-audit";
+import { auditCompanyLedgerBatched, type BatchedLedgerAudit } from "./batched-ledger-audit";
 
 /**
  * Privileged internal diagnostic. Authentication is checked at the service
@@ -13,7 +14,10 @@ import { auditCompanyLedger, type CompanyLedgerAudit } from "./ledger-audit";
  * role is mandatory even when local test/admin email overrides are enabled.
  * No balances are changed.
  */
-export async function runAdminLedgerAudit(companyId: string): Promise<CompanyLedgerAudit> {
+export async function runAdminLedgerAudit(
+  companyId: string,
+  mode: "standard" | "batched" = "standard",
+): Promise<CompanyLedgerAudit | BatchedLedgerAudit> {
   const user = await getCurrentUser();
   if (!user || user.platformRole !== "ADMIN")
     throw new ForbiddenError("Недостаточно прав для сверки бонусных балансов.");
@@ -31,12 +35,20 @@ export async function runAdminLedgerAudit(companyId: string): Promise<CompanyLed
     .limit(1))[0];
   if (!company) throw new NotFoundError("Компания не найдена.");
 
-  const report = await auditCompanyLedger(company.id);
+  if (mode !== "standard" && mode !== "batched")
+    throw new AppError("VALIDATION", "Неизвестный режим сверки.");
+
+  const report = mode === "batched"
+    ? await auditCompanyLedgerBatched(company.id)
+    : await auditCompanyLedger(company.id);
+  const discrepancyCount = "discrepancyCount" in report
+    ? report.discrepancyCount
+    : report.discrepancies.length;
   // Store only summary counts, never customer details, card identifiers or tokens.
-  await audit(report.discrepancies.length > 0 ? "loyalty.ledger.mismatch" : "loyalty.ledger.checked", {
+  await audit(discrepancyCount > 0 ? "loyalty.ledger.mismatch" : "loyalty.ledger.checked", {
     actorUserId: user.id,
     companyId: company.id,
-    meta: { cardsChecked: report.cardsChecked, discrepancyCount: report.discrepancies.length },
+    meta: { cardsChecked: report.cardsChecked, discrepancyCount, mode },
   });
   return report;
 }
