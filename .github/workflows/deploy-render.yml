@@ -32,8 +32,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          found="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success&per_page=10" --jq '[.workflow_runs[] | select(.head_sha == env.GITHUB_SHA)] | length')"
-          if [[ "$found" -lt 1 ]]; then
+          passed_sha="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // ""')"
+          if [[ "$passed_sha" != "$GITHUB_SHA" ]]; then
             echo "No successful CI run for the selected commit. Refusing deployment."
             exit 1
           fi
