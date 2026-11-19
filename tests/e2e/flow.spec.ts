@@ -105,6 +105,21 @@ test("core user journey", async ({ browser, baseURL }, testInfo) => {
     await proForm.locator('button[type="submit"]').click();
     await bp.waitForURL(/\/app\/billing\?status=success/);
     await expect(bp.getByText("Сейчас: PRO", { exact: false })).toBeVisible();
+
+    // Business owner can inspect the customer's history with real page links.
+    await bp.goto("/app/customers");
+    const customerLink = bp.locator('a[href^="/app/customers/"]').first();
+    await expect(customerLink).toBeVisible();
+    await customerLink.click();
+    await expect(bp.getByText("Всего операций: 1. Страница 1 из 1.")).toBeVisible();
+
+    // A stale/out-of-range page must offer a way back to valid history.
+    const historyUrl = new URL(bp.url());
+    historyUrl.searchParams.set("page", "99999");
+    await bp.goto(historyUrl.toString());
+    await expect(bp.getByRole("link", { name: "Последняя страница" })).toBeVisible();
+    await bp.getByRole("link", { name: "Последняя страница" }).click();
+    await expect(bp.getByText("Всего операций: 1. Страница 1 из 1.")).toBeVisible();
   }
 
   // 7. Tenant isolation
