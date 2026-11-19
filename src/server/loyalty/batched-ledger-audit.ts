@@ -103,5 +103,5 @@ export async function auditCompanyLedgerBatched(companyId: string): Promise<Batc
       sampleTruncated: discrepancyCount > discrepancies.length,
       consistentSnapshot: true,
     };
-  }, { isolationLevel: "repeatable read", readOnly: true });
+  }, { isolationLevel: "repeatable read", accessMode: "read only" });
 }
