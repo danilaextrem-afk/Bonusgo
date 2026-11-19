@@ -72,9 +72,10 @@ describe("complete company CSV exports", () => {
       expect(response.headers.get("content-disposition")).toContain("qronus-" + kind);
       expect(response.headers.get("cache-control")).toBe("no-store");
       expect(response.headers.get("x-content-type-options")).toBe("nosniff");
-      const payload = await response.text();
-      expect(payload.match(/\uFEFF/g)).toHaveLength(1);
-      expect(payload.startsWith("\uFEFF")).toBe(true);
+      // Fetch Response.text() strips a UTF-8 BOM; assert the actual download bytes.
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+      expect(Array.from(bytes.slice(3, 6))).not.toEqual([0xef, 0xbb, 0xbf]);
     }
     const invalid = await downloadCsv(new Request(base + "&kind=private"));
     expect(invalid.status).toBe(400);
