@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { desc, eq, ilike, or } from "drizzle-orm";
 import { Notice, formatDate } from "@/components/app/ui";
 import { formatMoney } from "@/lib/plans";
@@ -60,9 +61,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <p className="mb-5 text-sm text-muted">Валюты RUB и BYN показаны раздельно и никогда не суммируются.</p>
       {admin.platformRole === "ADMIN" && (
         <div className="mb-5">
-          <a href="/admin/ledger" className="text-sm font-semibold underline">
+          <Link href="/admin/ledger" className="text-sm font-semibold underline">
             Проверить расхождения бонусных балансов
-          </a>
+          </Link>
         </div>
       )}
 
