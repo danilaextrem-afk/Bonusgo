@@ -61,6 +61,13 @@ export async function processNotification(providerId: ProviderId, parsed: Verifi
     const [p] = await tx.select().from(schema.payments).where(eq(schema.payments.id, row.id));
     if (p.provider !== providerId) return { ok: false, reason: "provider_mismatch", _companyId: p.companyId, _audit: ["error.payment_provider_mismatch", { expected: p.provider, got: providerId, invoiceNo: p.invoiceNo }] };
 
+    // Check the amount and currency *before* recording an idempotency event.
+    // An invalid notification must not poison the event key and block a valid retry.
+    // Failed-payment callbacks intentionally do not require an amount match.
+    if (parsed.kind !== "failed" && (parsed.amountMinor !== p.amountMinor || (parsed.currency && parsed.currency !== p.currency))) {
+      return { ok: false, reason: "amount_mismatch", _companyId: p.companyId, _audit: ["error.payment_amount_mismatch", { invoiceNo: p.invoiceNo, expected: p.amountMinor, got: parsed.amountMinor, currency: p.currency, gotCurrency: parsed.currency ?? null }] };
+    }
+
     const eventKey = `${providerId}:${parsed.invoiceNo}:${parsed.kind}`;
     const ins = await tx
       .insert(schema.paymentEvents)
@@ -74,10 +81,6 @@ export async function processNotification(providerId: ProviderId, parsed: Verifi
       if (p.status !== "PENDING") return { ok: true, status: p.status, changed: false };
       await tx.update(schema.payments).set({ status: "FAILED", failReason: (parsed.failReason ?? "provider_failed").slice(0, 200), providerRef: parsed.providerRef ?? p.providerRef }).where(eq(schema.payments.id, p.id));
       return { ok: true, status: "FAILED", changed: true, companyId: p.companyId };
-    }
-
-    if (parsed.amountMinor !== p.amountMinor || (parsed.currency && parsed.currency !== p.currency)) {
-      return { ok: false, reason: "amount_mismatch", _companyId: p.companyId, _audit: ["error.payment_amount_mismatch", { invoiceNo: p.invoiceNo, expected: p.amountMinor, got: parsed.amountMinor, currency: p.currency, gotCurrency: parsed.currency ?? null }] };
     }
 
     const [company] = await tx.select().from(schema.companies).where(eq(schema.companies.id, p.companyId)).for("update");
