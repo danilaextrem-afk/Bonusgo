@@ -1,6 +1,8 @@
 name: Keep site awake
 # Render free instances sleep after ~15 min idle, so the first visitor waits ~50 s.
-# A customer scanning a QR at the counter should not wait, so we ping the health check.
+# A customer scanning a QR at the counter should not wait. This ping also
+# triggers the existing best-effort housekeeping scheduler on /api/health.
+# Render itself uses /api/live for side-effect-free process liveness.
 # Only 08:00–23:00 Moscow (05–19 UTC): the 750 free instance-hours/month are shared with
 # another free service in the same Render workspace, so 24/7 would exhaust them (~465 h used).
 on:
@@ -10,8 +12,13 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
-      - name: Ping health check
+      - name: Ping scheduler health endpoint; report unavailable service
         run: |
-          curl -fsS --retry 3 --retry-delay 20 -m 90 "${{ vars.APP_URL || 'https://qronus.onrender.com' }}/api/health" || echo "site did not respond"
+          set -euo pipefail
+          curl --fail --silent --show-error --output /dev/null \
+            --connect-timeout 10 --max-time 90 \
+            --retry 3 --retry-delay 15 \
+            "${{ vars.APP_URL || 'https://qronus.onrender.com' }}/api/health"
+          echo "QRonus health responded successfully"
