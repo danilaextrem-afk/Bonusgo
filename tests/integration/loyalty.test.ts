@@ -173,6 +173,41 @@ describe("operations", () => {
     expect(await db.select().from(schema.transactions)).toHaveLength(1);
   });
 
+  it("two simultaneous scans of one QR token permit only one accrual", async () => {
+    const s = await makeSetup();
+    const cust = await makeUser();
+    const base = { actorUserId: s.owner.id, companyId: s.company.id, programId: s.program.id };
+    const customerToken = await qr(cust.id);
+    const results = await Promise.allSettled([
+      accrue({ ...base, customerToken, idempotencyKey: key() }),
+      accrue({ ...base, customerToken, idempotencyKey: key() }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toMatchObject({ code: "INVALID_TOKEN" });
+    const [card] = await db.select().from(schema.cards).where(eq(schema.cards.customerId, cust.id));
+    expect(card.balance).toBe(1);
+    expect(await db.select().from(schema.transactions)).toHaveLength(1);
+  });
+
+  it("concurrent retries with one idempotency key write one transaction", async () => {
+    const s = await makeSetup();
+    const cust = await makeUser();
+    const base = { actorUserId: s.owner.id, companyId: s.company.id, programId: s.program.id };
+    const sameKey = key();
+    const tokens = await Promise.all([qr(cust.id), qr(cust.id)]);
+    const res = await Promise.all(tokens.map((customerToken) => accrue({
+      ...base, customerToken, idempotencyKey: sameKey,
+    })));
+    expect(res.filter((r) => !r.duplicated)).toHaveLength(1);
+    expect(res.filter((r) => r.duplicated)).toHaveLength(1);
+    expect(res[0].transaction.id).toBe(res[1].transaction.id);
+    const [card] = await db.select().from(schema.cards).where(eq(schema.cards.customerId, cust.id));
+    expect(card.balance).toBe(1);
+    expect(await db.select().from(schema.transactions)).toHaveLength(1);
+  });
+
   it("two concurrent redemptions cannot overdraw a stamp balance", async () => {
     const s = await makeSetup({ stampsRequired: 3 });
     const cust = await makeUser();
