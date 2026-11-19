@@ -135,6 +135,45 @@ describe("Platega", () => {
     expect(after).toMatchObject({ status: "FAILED", failReason: "platega_canceled" });
   });
 
+  it("accepts verified CONFIRMED after a prior Platega cancellation, exactly once", async () => {
+    const { c, p } = await checkout();
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CANCELED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    expect((await cb({ id: p.providerRef })).status).toBe(200);
+    expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("FREE");
+    expect((await db.select().from(schema.payments).where(eq(schema.payments.id, p.id)))[0].status).toBe("FAILED");
+
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    expect((await cb({ id: p.providerRef })).status).toBe(200);
+    expect((await cb({ id: p.providerRef })).status).toBe(200);
+    expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("PRO");
+    expect((await db.select().from(schema.payments).where(eq(schema.payments.id, p.id)))[0].status).toBe("PAID");
+    expect(await db.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.paymentId, p.id))).toHaveLength(2);
+  });
+
+  it("handles provider-verified full CHARGEBACKED as a single reversal of a paid plan", async () => {
+    const { c, p } = await checkout();
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    await cb({ id: p.providerRef });
+    expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("PRO");
+
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CHARGEBACKED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    expect((await cb({ id: p.providerRef })).status).toBe(200);
+    expect((await cb({ id: p.providerRef })).status).toBe(200);
+    expect((await db.select().from(schema.payments).where(eq(schema.payments.id, p.id)))[0].status).toBe("REFUNDED");
+    expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("FREE");
+    expect(await db.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.paymentId, p.id))).toHaveLength(2);
+  });
+
+  it("ignores disputed and partial-refund statuses without falsely issuing or revoking access", async () => {
+    const { c, p } = await checkout();
+    for (const status of ["DISPUTED", "PARTIALLY_REFUNDED"]) {
+      fetchMock.mockImplementation(async () => json({ id: p.providerRef, status, paymentDetails: { amount: 990, currency: "RUB" } }));
+      expect((await cb({ id: p.providerRef })).status).toBe(200);
+      expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("FREE");
+    }
+    expect(await db.select().from(schema.paymentEvents)).toHaveLength(0);
+  });
+
   it("issues the НПД receipt automatically after payment when Мой налог is configured", async () => {
     const { p } = await checkout();
     Object.assign(process.env, { NALOG_INN: "000000000000", NALOG_PASSWORD: "x" });
