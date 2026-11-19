@@ -87,7 +87,13 @@ export async function requireUser(): Promise<User> {
  */
 export function isPlatformAdmin(u: Pick<User, "platformRole" | "email">): boolean {
   if (u.platformRole === "ADMIN") return true;
-  if (process.env.NODE_ENV === "production" && process.env.ALLOW_TEST_PAYMENTS !== "true") return false;
+  // A production server must never grant admin rights from an unverified email.
+  // The sole exception is the explicitly configured GitHub Actions E2E sandbox,
+  // where synthetic admin users are created for tests without real credentials.
+  const githubE2ESandbox = process.env.GITHUB_ACTIONS === "true"
+    && process.env.CI === "true"
+    && process.env.ALLOW_TEST_PAYMENTS === "true";
+  if (process.env.NODE_ENV === "production" && !githubE2ESandbox) return false;
   const list = (process.env.ADMIN_EMAILS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   return list.includes(u.email.toLowerCase());
 }
