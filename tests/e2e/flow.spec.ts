@@ -114,6 +114,11 @@ test("core user journey", async ({ browser, baseURL }, testInfo) => {
   await expect(ap).toHaveURL(/\/login/);
   const adminRes = await bp.goto("/admin");
   expect(adminRes?.status()).toBe(404);
+  // Diagnostic page must not leak ledger data to ordinary businesses.
+  const ledgerDenied = await bp.goto("/admin/ledger");
+  expect(ledgerDenied?.status()).toBe(404);
+  await ap.goto("/admin/ledger");
+  await expect(ap).toHaveURL(/\/login/);
 
   // 9. Mobile overflow
   if (testInfo.project.name === "android") {
