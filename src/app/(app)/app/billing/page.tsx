@@ -11,6 +11,9 @@ import Link from "next/link";
 import { db, schema } from "@/server/db";
 import { receiptUrl } from "@/server/payments/npd";
 import { cancelSubscriptionAction } from "../actions";
+import { providerFor } from "@/server/payments/registry";
+import { priceFor, type Months } from "@/server/payments/service";
+import { PLATEGA_MAX_MINOR } from "@/server/payments/platega";
 
 export const dynamic = "force-dynamic";
 
@@ -30,14 +33,15 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   ]);
   const cur = COUNTRY[company.country].currency;
   const isOwner = role === "OWNER";
+  const plategaCheckout = providerFor(company.country).id === "platega";
   const rank: Record<PlanId, number> = { FREE: 0, PRO: 1, TOP: 2 };
   return (
     <>
       <PageHeader title="Тариф и оплата" subtitle={`Сейчас: ${PLAN_NAMES[plan]}${company.planExpiresAt && plan !== "FREE" ? ` · действует до ${formatDate(company.planExpiresAt).split(",")[0]}` : ""}`} />
       <div className="space-y-4">
-        {status === "success" && <Notice tone="ok">Оплата прошла. Тариф обновится в течение минуты — если нет, обновите страницу.</Notice>}
+        {status === "success" && <Notice tone="warn">Вы вернулись со страницы оплаты. Это ещё не подтверждает списание: тариф активируется после проверки платежа провайдером. Обновите страницу, чтобы увидеть актуальный тариф.</Notice>}
         {status === "unavailable" && <Notice tone="warn">Оплата временно недоступна. Попробуйте позже или напишите нам.</Notice>}
-        {status === "fail" && <Notice tone="danger">Оплата не прошла. Деньги не списаны. Попробуйте ещё раз или другой способ оплаты.</Notice>}
+        {status === "fail" && <Notice tone="danger">Платёж не подтверждён на этой странице. Проверьте статус в истории оплат, прежде чем повторять покупку.</Notice>}
         {company.country === "BY" && (
           <Notice tone="warn">Оплата в BYN появится после подключения платёжного провайдера. Цены ниже ориентировочные и подтверждаются при запуске оплаты.</Notice>
         )}
@@ -50,6 +54,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <UsageBar label="Сотрудники" used={usage.staff} limit={usage.limits.staff} />
         </div>
 
+        {plategaCheckout && (
+          <Notice tone="warn">Лимит Platega — 10 000 ₽ за один платёж. Длительные периоды с большей суммой недоступны; разбивать платежи автоматически мы не будем.</Notice>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           {(["PRO", "TOP"] as const).map((p) => {
             const price = PLAN_PRICES[company.country][p];
@@ -73,16 +80,21 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                     <fieldset>
                       <legend className="label">Срок</legend>
                       <div className="grid grid-cols-3 gap-2">
-                        {[1, 3, 12].map((m) => (
-                          <label key={m} className="cursor-pointer rounded-xl border border-line px-2 py-2 text-center text-sm has-[:checked]:border-neon has-[:checked]:text-neon">
-                            <input type="radio" name="months" value={m} defaultChecked={m === 1} className="sr-only" />
-                            {m} мес
-                          </label>
-                        ))}
+                        {([1, 3, 12] as const).map((m: Months) => {
+                          const total = priceFor(company.country, p, m);
+                          const disabled = plategaCheckout && total > PLATEGA_MAX_MINOR;
+                          return (
+                            <label key={m} className={`rounded-xl border border-line px-2 py-2 text-center text-sm has-[:checked]:border-neon has-[:checked]:text-neon ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}>
+                              <input type="radio" name="months" value={m} defaultChecked={m === 1} disabled={disabled} className="sr-only" />
+                              <span className="block">{m} мес</span>
+                              <span className="block text-[11px]">{formatMoney(total, cur)}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     </fieldset>
-                    <SubmitButton className="btn-primary w-full">{isCurrent ? "Продлить" : `Перейти на ${p}`}</SubmitButton>
-                    <p className="text-xs text-muted">Итоговая сумма показывается на странице оплаты.</p>
+                    <SubmitButton className="btn-primary w-full">{isCurrent ? "Оплатить продление" : `Оплатить ${p}`}</SubmitButton>
+                    <p className="text-xs text-muted">После нажатия откроется платёжная страница провайдера. Тариф активируется только после подтверждения платежа сервером.</p>
                   </form>
                 ) : (
                   <p className="mt-auto text-xs text-muted">{isOwner ? "Ваш тариф выше." : "Оплату может выполнить владелец компании."}</p>

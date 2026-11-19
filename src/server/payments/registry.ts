@@ -14,10 +14,11 @@ export const PROVIDERS: Record<ProviderId, PaymentProvider> = { robokassa, bepai
  * Falls back to the mock provider only when PAYMENTS_TEST_MODE=true and the real one is not configured.
  */
 export function providerFor(country: CountryCode): PaymentProvider {
+  // Platega is the preferred RU acquirer only after explicit live enablement
+  // and all legal/contact prerequisites pass the fail-closed readiness checks.
+  if (country === "RU" && platega.isLive()) return platega;
   const real = country === "RU" ? robokassa : bepaid;
   if (real.isConfigured()) return real;
-  // RU: automatic СБП/card payments through Platega when its credentials are set.
-  if (country === "RU" && platega.isConfigured()) return platega;
   // RU without an acquiring contract: manual SBP transfer to the owner's account (SBP_PHONE).
   if (country === "RU" && sbp.isConfigured()) return sbp;
   if (testModeOn()) return mock;

@@ -21,8 +21,8 @@ export async function POST(req: Request) {
     if (!(await verifyCsrf(csrf))) throw new ForbiddenError("Недействительный токен формы. Обновите страницу и повторите попытку.");
     const f = schema.safeParse(form);
     if (!f.success) return billing("error");
-    await requireMembership(f.data.companyId, ["OWNER"]);
-    const o = await createPaymentOrder(f.data.companyId, f.data.plan, f.data.months);
+    const { user } = await requireMembership(f.data.companyId, ["OWNER"]);
+    const o = await createPaymentOrder(f.data.companyId, f.data.plan, f.data.months, { id: user.id, email: user.email });
     return NextResponse.redirect(o.redirectUrl, 303);
   } catch (e) {
     if (e instanceof AppError) return NextResponse.json({ error: e.code, message: e.message }, { status: e.status });
