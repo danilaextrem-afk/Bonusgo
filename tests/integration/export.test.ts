@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/headers", async () => (await import("./helpers")).nextHeadersMock);
 vi.mock("next/navigation", async () => (await import("./helpers")).nextNavigationMock);
 
+import { eq } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { createSession } from "@/server/auth/session";
 import { GET as downloadCsv } from "@/app/api/app/export/route";
@@ -52,6 +53,64 @@ describe("complete company CSV exports", () => {
     expect(cards.match(/\uFEFF/g)).toHaveLength(1);
     expect(cards).toContain(card.id);
     expect(cards).not.toContain(otherCard.id);
+  });
+
+  it("exports monthly and daily UTC batches without overlap at calendar boundaries", async () => {
+    const setup = await makeSetup({ plan: "TOP" });
+    const users = await Promise.all([makeUser(), makeUser(), makeUser()]);
+    const cards = await Promise.all(users.map((user) => joinProgram(user.id, setup.program.id)));
+    const timestamps = [
+      "2024-02-28T23:59:59.999Z",
+      "2024-02-29T23:59:59.999Z",
+      "2024-03-01T00:00:00.000Z",
+    ];
+    for (let i = 0; i < cards.length; i++) {
+      await db.update(schema.cards).set({ createdAt: new Date(timestamps[i]) })
+        .where(eq(schema.cards.id, cards[i].id));
+    }
+    const inserted = await db.insert(schema.transactions).values(cards.map((card, i) => ({
+      companyId: setup.company.id,
+      cardId: card.id,
+      type: "ACCRUE" as const,
+      amount: i + 1,
+      idempotencyKey: `period-export-${i}`,
+      createdAt: new Date(timestamps[i]),
+    }))).returning({ id: schema.transactions.id });
+
+    const febCards = await exportCompanyCsv(setup.company.id, "2024-02");
+    const marCards = await exportCompanyCsv(setup.company.id, "2024-03");
+    expect(febCards).toContain(cards[0].id);
+    expect(febCards).toContain(cards[1].id);
+    expect(febCards).not.toContain(cards[2].id);
+    expect(marCards).toContain(cards[2].id);
+    expect(marCards).not.toContain(cards[1].id);
+
+    const leapDay = await exportCompanyTransactionsCsv(setup.company.id, "2024-02-29");
+    const febTx = await exportCompanyTransactionsCsv(setup.company.id, "2024-02");
+    const marTx = await exportCompanyTransactionsCsv(setup.company.id, "2024-03");
+    expect(leapDay).toContain(inserted[1].id);
+    expect(leapDay).not.toContain(inserted[0].id);
+    expect(leapDay).not.toContain(inserted[2].id);
+    expect(febTx).toContain(inserted[0].id);
+    expect(febTx).toContain(inserted[1].id);
+    expect(febTx).not.toContain(inserted[2].id);
+    expect(marTx).toContain(inserted[2].id);
+    expect(marTx).not.toContain(inserted[1].id);
+
+    await createSession(setup.owner.id);
+    const url = `http://localhost:3000/api/app/export?companyId=${setup.company.id}&kind=transactions&period=2024-02`;
+    const response = await downloadCsv(new Request(url));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toContain("qronus-transactions-2024-02.csv");
+    const csv = await response.text();
+    expect(csv).toContain(inserted[0].id);
+    expect(csv).not.toContain(inserted[2].id);
+
+    for (const period of ["2023-02-29", "2024-02-30", "2024-13", "../../etc"]) {
+      const invalid = await downloadCsv(new Request(url.replace("2024-02", encodeURIComponent(period))));
+      expect(invalid.status).toBe(400);
+      expect((await invalid.json()).error).toBe("VALIDATION");
+    }
   });
 
   it("requires an eligible plan for transaction exports", async () => {
