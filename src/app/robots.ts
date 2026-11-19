@@ -6,6 +6,9 @@ const PRIVATE = ["/app", "/me", "/admin", "/api", "/login", "/register", "/reset
 const AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "PerplexityBot", "Google-Extended", "YandexAdditional", "YandexAdditionalBot"];
 
 export default function robots(): MetadataRoute.Robots {
+  if (process.env.QRONUS_STAGING === "true") {
+    return { rules: { userAgent: "*", disallow: "/" } };
+  }
   return {
     rules: [
       { userAgent: "*", allow: "/", disallow: PRIVATE },

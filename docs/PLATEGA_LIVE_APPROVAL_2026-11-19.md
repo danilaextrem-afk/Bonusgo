@@ -6,7 +6,7 @@
 - Maximum total of one transaction: **10,000 RUB (1,000,000 kopecks)**.
 - Proposed methods: SBP/NSPK, 8.5% fee; crypto, 5% fee. Treat as a proposal, not a signed agreement.
 - Current implementation uses SBP method 2 **only**. No crypto checkout, wallet top-ups or physical goods are implemented.
-- QRonus TOP x3 = 14,670 RUB; TOP x12 = 48,900 RUB. Both are **blocked** when Platega is selected. PRO x12 = 9,900 RUB and remains within the cap. No automatic splitting of orders.
+- QRonus TOP x3 = 2,970 RUB. TOP x12 is 9,900 RUB and PRO x12 is 4,900 RUB. Both and fit the Platega limit. No automatic splitting of orders.
 - Invoice totals are calculated on the server, never trusted from request data.
 
 ## Public-review requirements

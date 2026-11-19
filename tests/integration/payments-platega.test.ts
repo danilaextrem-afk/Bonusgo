@@ -64,24 +64,28 @@ describe("Platega", () => {
   it("creates an SBP transaction with provider-generated UUID, buyer email and return URLs", async () => {
     const { o, p } = await checkout();
     expect(o.redirectUrl).toBe("https://pay.platega.io/?qrsbp=1");
-    expect(p).toMatchObject({ provider: "platega", amountMinor: 990_00, testMode: false });
+    expect(p).toMatchObject({ provider: "platega", amountMinor: 490_00, testMode: false });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://app.platega.io/transaction/process");
     expect(init.headers).toMatchObject({ "X-MerchantId": MID, "X-Secret": SECRET });
     const body = JSON.parse(init.body);
-    expect(body).toMatchObject({ paymentMethod: 2, paymentDetails: { amount: 990, currency: "RUB" }, return: "https://qronus.example/app/billing?status=success", metadata: { userId: PAYER.id, user_email: PAYER.email } });
+    expect(body).toMatchObject({ paymentMethod: 2, paymentDetails: { amount: 490, currency: "RUB" }, return: "https://qronus.example/app/billing?status=success", metadata: { userId: PAYER.id, user_email: PAYER.email } });
     expect(body).not.toHaveProperty("id");
     expect(init.redirect).toBe("error");
     expect(p.providerRef).toBe(TRANSACTION_ID);
   });
 
-  it("rejects TOP 3/12-month purchases above 10 000 RUB before creating an order", async () => {
-    const c = await company();
-    await expect(createPaymentOrder(c.id, "TOP", 3, PAYER, CHECKOUT_KEY)).rejects.toMatchObject({ code: "platega_amount_limit" });
-    await expect(createPaymentOrder(c.id, "TOP", 12, PAYER, CHECKOUT_KEY)).rejects.toMatchObject({ code: "platega_amount_limit" });
-    expect(await db.select().from(schema.payments).where(eq(schema.payments.companyId, c.id))).toHaveLength(0);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+  it.each([[1, 990], [3, 2970], [12, 9900]] as const)(
+    "charges the correct TOP price for %i months within the Platega limit",
+    async (months, amount) => {
+      const c = await company();
+      fetchMock.mockResolvedValueOnce(json({ transactionId: TRANSACTION_ID, redirect: "https://pay.platega.io/checkout" }));
+      const order = await createPaymentOrder(c.id, "TOP", months, PAYER, CHECKOUT_KEY);
+      const [payment] = await db.select().from(schema.payments).where(eq(schema.payments.id, order.paymentId));
+      expect(payment).toMatchObject({ amountMinor: amount * 100, currency: "RUB", months });
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body).paymentDetails).toEqual({ amount, currency: "RUB" });
+    },
+  );
 
   it("refuses live payment when legal/support readiness is incomplete", async () => {
     delete process.env.CONTACT_EMAIL;
@@ -149,7 +153,7 @@ describe("Platega", () => {
   it("keeps an early full reversal terminal when a delayed confirmation arrives", async () => {
     const { c, p } = await checkout();
     for (const status of ["CHARGEBACKED", "CONFIRMED"]) {
-      fetchMock.mockResolvedValueOnce(json({ id: p.providerRef, status, paymentDetails: { amount: 990, currency: "RUB" } }));
+      fetchMock.mockResolvedValueOnce(json({ id: p.providerRef, status, paymentDetails: { amount: 490, currency: "RUB" } }));
       expect((await cb({ id: p.providerRef })).status).toBe(200);
     }
     expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("FREE");
@@ -164,7 +168,7 @@ describe("Platega", () => {
 
   it("activates the plan only after re-reading CONFIRMED status from the API; duplicates are no-ops", async () => {
     const { c, p } = await checkout();
-    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 490, currency: "RUB" } }));
     const replies = await Promise.all([
       cb({ id: p.providerRef, status: "CONFIRMED" }),
       cb({ id: p.providerRef, status: "CONFIRMED" }),
@@ -178,8 +182,8 @@ describe("Platega", () => {
 
   it("ignores a forged CONFIRMED callback when the API says the payment is still pending", async () => {
     const { c, p } = await checkout();
-    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "PENDING", paymentDetails: { amount: 990, currency: "RUB" } }));
-    await cb({ id: p.providerRef, status: "CONFIRMED", amount: 990 });
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "PENDING", paymentDetails: { amount: 490, currency: "RUB" } }));
+    await cb({ id: p.providerRef, status: "CONFIRMED", amount: 490 });
     const [after] = await db.select().from(schema.companies).where(eq(schema.companies.id, c.id));
     expect(after.plan).toBe("FREE");
   });
@@ -195,7 +199,7 @@ describe("Platega", () => {
   it("does not round a provider amount with three fractional digits into a valid payment", async () => {
     const { c, p } = await checkout();
     fetchMock.mockImplementation(async () => json({
-      id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 990.001, currency: "RUB" },
+      id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 490.001, currency: "RUB" },
     }));
     expect((await cb({ id: p.providerRef })).status).toBe(200);
     expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("FREE");
@@ -205,7 +209,7 @@ describe("Platega", () => {
 
   it("marks canceled payments as FAILED", async () => {
     const { p } = await checkout();
-    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CANCELED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CANCELED", paymentDetails: { amount: 490, currency: "RUB" } }));
     await cb({ id: p.providerRef });
     const [after] = await db.select().from(schema.payments).where(eq(schema.payments.id, p.id));
     expect(after).toMatchObject({ status: "FAILED", failReason: "platega_canceled" });
@@ -213,12 +217,12 @@ describe("Platega", () => {
 
   it("accepts verified CONFIRMED after a prior Platega cancellation, exactly once", async () => {
     const { c, p } = await checkout();
-    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CANCELED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CANCELED", paymentDetails: { amount: 490, currency: "RUB" } }));
     expect((await cb({ id: p.providerRef })).status).toBe(200);
     expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("FREE");
     expect((await db.select().from(schema.payments).where(eq(schema.payments.id, p.id)))[0].status).toBe("FAILED");
 
-    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 490, currency: "RUB" } }));
     expect((await cb({ id: p.providerRef })).status).toBe(200);
     expect((await cb({ id: p.providerRef })).status).toBe(200);
     expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("PRO");
@@ -228,11 +232,11 @@ describe("Platega", () => {
 
   it("handles provider-verified full CHARGEBACKED as a single reversal of a paid plan", async () => {
     const { c, p } = await checkout();
-    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 490, currency: "RUB" } }));
     await cb({ id: p.providerRef });
     expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("PRO");
 
-    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CHARGEBACKED", paymentDetails: { amount: 990, currency: "RUB" } }));
+    fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CHARGEBACKED", paymentDetails: { amount: 490, currency: "RUB" } }));
     expect((await cb({ id: p.providerRef })).status).toBe(200);
     expect((await cb({ id: p.providerRef })).status).toBe(200);
     expect((await db.select().from(schema.payments).where(eq(schema.payments.id, p.id)))[0].status).toBe("REFUNDED");
@@ -243,7 +247,7 @@ describe("Platega", () => {
   it("ignores disputed and partial-refund statuses without falsely issuing or revoking access", async () => {
     const { c, p } = await checkout();
     for (const status of ["DISPUTED", "PARTIALLY_REFUNDED"]) {
-      fetchMock.mockImplementation(async () => json({ id: p.providerRef, status, paymentDetails: { amount: 990, currency: "RUB" } }));
+      fetchMock.mockImplementation(async () => json({ id: p.providerRef, status, paymentDetails: { amount: 490, currency: "RUB" } }));
       expect((await cb({ id: p.providerRef })).status).toBe(200);
       expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("FREE");
     }
@@ -254,7 +258,7 @@ describe("Platega", () => {
     const { p } = await checkout();
     Object.assign(process.env, { NALOG_INN: "000000000000", NALOG_PASSWORD: "x" });
     fetchMock
-      .mockResolvedValueOnce(json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 990, currency: "RUB" } }))
+      .mockResolvedValueOnce(json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 490, currency: "RUB" } }))
       .mockResolvedValueOnce(json({ token: "t", tokenExpireIn: new Date(Date.now() + 3600_000).toISOString() }))
       .mockResolvedValueOnce(json({ approvedReceiptUuid: "rcpt-platega" }));
     await cb({ id: p.providerRef });

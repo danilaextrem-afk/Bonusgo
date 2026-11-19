@@ -396,8 +396,8 @@ describe("referrals & platform stats", () => {
     await makeCompany(u.id, { country: "BY", plan: "PRO", planExpiresAt: future });
     await makeCompany(u.id, { country: "BY" });
     const st = await getPlatformStats();
-    expect(st.mrr).toEqual({ RUB: 990_00 + 4890_00, BYN: 35_00 });
-    expect(st.RU.mrr).toEqual({ RUB: 990_00 + 4890_00 });
+    expect(st.mrr).toEqual({ RUB: 490_00 + 990_00, BYN: 35_00 });
+    expect(st.RU.mrr).toEqual({ RUB: 490_00 + 990_00 });
     expect(st.BY.mrr).toEqual({ BYN: 35_00 });
     expect(st.RU.paidCompanies).toBe(2);
     expect(st.total.companies).toBe(5);

@@ -108,7 +108,7 @@ describe("providers", () => {
 
 describe("helpers", () => {
   it("prices: 3 months = 3x, 12 months = 10x", () => {
-    expect(priceFor("RU", "PRO", 3)).toBe(990_00 * 3);
+    expect(priceFor("RU", "PRO", 3)).toBe(490_00 * 3);
     expect(priceFor("BY", "TOP", 12)).toBe(169_00 * 10);
   });
   it("parseMinor is exact", () => {

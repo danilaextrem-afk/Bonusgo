@@ -29,7 +29,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimits> = {
 
 /** Monthly prices in minor units (kopecks / BYN kopecks). */
 export const PLAN_PRICES: Record<CountryCode, Record<Exclude<PlanId, "FREE">, number>> = {
-  RU: { PRO: 990_00, TOP: 4890_00 },
+  RU: { PRO: 490_00, TOP: 990_00 },
   BY: { PRO: 35_00, TOP: 169_00 },
 };
 

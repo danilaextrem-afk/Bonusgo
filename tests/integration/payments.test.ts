@@ -37,7 +37,7 @@ describe("payments pipeline", () => {
   it("creates a PENDING order with server-side amount and mock redirect", async () => {
     const c = await company();
     const { o, p } = await order(c.id, "TOP", 12);
-    expect(p).toMatchObject({ status: "PENDING", amountMinor: 4890_00 * 10, currency: "RUB", provider: "mock", months: 12 });
+    expect(p).toMatchObject({ status: "PENDING", amountMinor: 990_00 * 10, currency: "RUB", provider: "mock", months: 12 });
     expect(o.redirectUrl).toContain(`/api/payments/mock/complete?invoice=${p.invoiceNo}&sig=`);
     const by = await company({ country: "BY", currency: "BYN" });
     expect((await order(by.id, "PRO", 3)).p).toMatchObject({ amountMinor: 35_00 * 3, currency: "BYN" });

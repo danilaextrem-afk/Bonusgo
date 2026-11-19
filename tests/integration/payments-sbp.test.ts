@@ -45,7 +45,7 @@ describe("manual SBP payments", () => {
     const o = await createPaymentOrder(c.id, "PRO", 1);
     expect(o.redirectUrl).toContain(`/app/billing/sbp/${o.paymentId}`);
     const p = await getPayment(o.paymentId);
-    expect(p).toMatchObject({ provider: "sbp", amountMinor: 990_00, currency: "RUB", testMode: false, status: "PENDING" });
+    expect(p).toMatchObject({ provider: "sbp", amountMinor: 490_00, currency: "RUB", testMode: false, status: "PENDING" });
     const view = await getSbpPayment(c.id, o.paymentId);
     expect(view.code).toBe(`BG-${p.invoiceNo}`);
   });
@@ -129,7 +129,7 @@ describe("manual SBP payments", () => {
     const conf = await confirmSbpPayment(o.paymentId, "admin");
     expect(conf.receipt).toEqual({ ok: true, id: "rcpt-1" });
     const body = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(body).toMatchObject({ totalAmount: "4890.00", client: { incomeType: "FROM_LEGAL_ENTITY", inn: "7700000000", displayName: "ООО Ромашка" } });
+    expect(body).toMatchObject({ totalAmount: "990.00", client: { incomeType: "FROM_LEGAL_ENTITY", inn: "7700000000", displayName: "ООО Ромашка" } });
     expect(fetchMock.mock.calls[1][1].headers.authorization).toBe("Bearer t");
     expect((await getPayment(o.paymentId)).npdReceiptId).toBe("rcpt-1");
   });
