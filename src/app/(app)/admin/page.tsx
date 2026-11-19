@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Админ-панель", robots: { 
 const STATUS_RU: Record<string, string> = { PENDING: "Ожидает", PAID: "Оплачен", FAILED: "Неуспешно", REFUNDED: "Возврат", CANCELED: "Отменён", CANCELLED: "Отменён" };
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ market?: string }> }) {
-  await requirePlatformAdmin();
+  const admin = await requirePlatformAdmin();
   const sp = await searchParams;
   const market: Market = sp.market === "RU" || sp.market === "BY" ? sp.market : "ALL";
   const [stats, diag, errors, failed, claims] = await Promise.all([
@@ -58,6 +58,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     <main className="container-x overflow-x-hidden py-6">
       <h1 className="mb-1 text-2xl font-bold">Админ-панель</h1>
       <p className="mb-5 text-sm text-muted">Валюты RUB и BYN показаны раздельно и никогда не суммируются.</p>
+      {admin.platformRole === "ADMIN" && (
+        <div className="mb-5">
+          <a href="/admin/ledger" className="text-sm font-semibold underline">
+            Проверить расхождения бонусных балансов
+          </a>
+        </div>
+      )}
 
       <section className="mb-8">
         <h2 className="mb-2 flex flex-wrap items-center gap-2 font-semibold">Оплаты по СБП {pending > 0 && <span className="badge">ждут: {pending}</span>}</h2>
