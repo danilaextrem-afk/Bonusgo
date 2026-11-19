@@ -2,7 +2,7 @@ import "server-only";
 import { timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/server/db";
-import { PaymentError, appUrl, formatMajor, type PaymentProvider, type VerifiedNotification } from "./types";
+import { PaymentError, appUrl, formatMajor, parseMinor, type PaymentProvider, type VerifiedNotification } from "./types";
 
 /**
  * Platega.io, RUB: https://docs.platega.io/ (checked 2026-11-19).
@@ -11,7 +11,8 @@ import { PaymentError, appUrl, formatMajor, type PaymentProvider, type VerifiedN
  * Live activation requires an explicit environment flag and verified merchant setup.
  * Current approved merchant method: 2 = СБП (QR НСПК).
  */
-const BASE = (process.env.PLATEGA_API_URL ?? "https://app.platega.io").replace(/\/$/, "");
+// Credentials must never be sent to a configurable/third-party hostname.
+const BASE = "https://app.platega.io";
 export const PLATEGA_MAX_MINOR = 10_000_00;
 const ALLOWED_METHODS = new Set([2]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -101,11 +102,13 @@ export async function verifyPlategaTransaction(transactionId: string): Promise<V
   if (!res.ok) throw new Error(`Platega status HTTP ${res.status}`);
   const tx = (await res.json()) as PlategaTx;
   if (tx.id !== transactionId) return null;
-  const amount = Math.round(Number(tx.paymentDetails?.amount ?? NaN) * 100);
+  // Exact minor-unit parsing: never round an unexpected fractional amount
+  // into a valid invoice total.
+  const amount = parseMinor(String(tx.paymentDetails?.amount ?? ""));
   const currency = tx.paymentDetails?.currency === "RUB" ? "RUB" : undefined;
   const raw = { transactionId, status: tx.status, amount: tx.paymentDetails?.amount ?? null, currency: tx.paymentDetails?.currency ?? null };
   // Never activate when Platega omits the currency or reports another currency.
-  if (tx.status === "CONFIRMED" && currency !== "RUB") return null;
+  if ((tx.status === "CONFIRMED" || tx.status === "CHARGEBACKED") && (!Number.isSafeInteger(amount) || currency !== "RUB")) return null;
   if (tx.status === "CONFIRMED") return { ok: true, invoiceNo: p.invoiceNo, amountMinor: amount, currency, kind: "paid", providerRef: transactionId, raw };
   // A full chargeback is a reversal of an already confirmed transaction.
   // Read it from the current provider status, not from the untrusted callback body.
