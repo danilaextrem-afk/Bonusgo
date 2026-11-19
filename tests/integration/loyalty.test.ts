@@ -136,8 +136,9 @@ describe("operations", () => {
     const s = await makeSetup();
     const cust = await makeUser();
     const k1 = key();
-    const first = await accrue({ actorUserId: s.owner.id, companyId: s.company.id, programId: s.program.id, customerToken: await qr(cust.id), idempotencyKey: k1 });
-    const again = await accrue({ actorUserId: s.owner.id, companyId: s.company.id, programId: s.program.id, customerToken: "BG1.whatever-token-reused-xx", idempotencyKey: k1 });
+    const token = await qr(cust.id);
+    const first = await accrue({ actorUserId: s.owner.id, companyId: s.company.id, programId: s.program.id, customerToken: token, idempotencyKey: k1 });
+    const again = await accrue({ actorUserId: s.owner.id, companyId: s.company.id, programId: s.program.id, customerToken: token, idempotencyKey: k1 });
     expect(first.duplicated).toBe(false);
     expect(again.duplicated).toBe(true);
     expect(again.transaction.id).toBe(first.transaction.id);
@@ -150,7 +151,8 @@ describe("operations", () => {
     const cust = await makeUser();
     const sameKey = key();
     const base = { actorUserId: s.owner.id, companyId: s.company.id, programId: s.program.id };
-    const first = await accrue({ ...base, customerToken: await qr(cust.id), stamps: 3, idempotencyKey: sameKey });
+    const originalToken = await qr(cust.id);
+    const first = await accrue({ ...base, customerToken: originalToken, stamps: 3, idempotencyKey: sameKey });
 
     await expect(redeem({ ...base, customerToken: await qr(cust.id), idempotencyKey: sameKey }))
       .rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT", status: 409 });
@@ -167,11 +169,48 @@ describe("operations", () => {
       .rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT", status: 409 });
 
     // A genuine retry of the same actor/action/program remains idempotent.
-    const replay = await accrue({ ...base, customerToken: "BG1.invalid-retry-token-xx", idempotencyKey: sameKey });
+    const replay = await accrue({ ...base, customerToken: originalToken, idempotencyKey: sameKey });
     expect(replay.duplicated).toBe(true);
     expect(replay.transaction.id).toBe(first.transaction.id);
     expect(replay.card.balance).toBe(3);
     expect(await db.select().from(schema.transactions)).toHaveLength(1);
+  });
+
+  it("rejects cross-customer and forged-QR retries with the same staff, program and idempotency key", async () => {
+    const setup = await makeSetup({ plan: "TOP" });
+    const alice = await makeUser();
+    const bob = await makeUser();
+    const base = {
+      actorUserId: setup.owner.id,
+      companyId: setup.company.id,
+      programId: setup.program.id,
+      idempotencyKey: key(),
+    };
+    const aliceQr = await qr(alice.id);
+    const first = await accrue({ ...base, customerToken: aliceQr, stamps: 2 });
+    const bobQr = await qr(bob.id);
+
+    // Prior code would return Alice's balance and transaction to the request
+    // carrying Bob's QR code, without checking QR ownership.
+    await expect(accrue({ ...base, customerToken: bobQr, stamps: 2 }))
+      .rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT", status: 409 });
+    await expect(accrue({ ...base, customerToken: "BG1.fake-token-with-no-owner", stamps: 2 }))
+      .rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT", status: 409 });
+
+    const retry = await accrue({ ...base, customerToken: aliceQr, stamps: 2 });
+    expect(retry.duplicated).toBe(true);
+    expect(retry.transaction.id).toBe(first.transaction.id);
+
+    // Another legitimate QR for Alice is acceptable, but is not consumed.
+    const freshAliceQr = await qr(alice.id);
+    const retryWithNewQr = await accrue({ ...base, customerToken: freshAliceQr, stamps: 2 });
+    expect(retryWithNewQr.duplicated).toBe(true);
+    expect(retryWithNewQr.transaction.id).toBe(first.transaction.id);
+    expect(await db.select().from(schema.transactions)).toHaveLength(1);
+    const cards = await db.select().from(schema.cards);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].customerId).toBe(alice.id);
+    expect(cards[0].balance).toBe(2);
   });
 
   it("two simultaneous scans of one QR token permit only one accrual", async () => {
