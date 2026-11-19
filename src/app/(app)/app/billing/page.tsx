@@ -39,9 +39,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
     <>
       <PageHeader title="Тариф и оплата" subtitle={`Сейчас: ${PLAN_NAMES[plan]}${company.planExpiresAt && plan !== "FREE" ? ` · действует до ${formatDate(company.planExpiresAt).split(",")[0]}` : ""}`} />
       <div className="space-y-4">
-        {status === "success" && <Notice tone="ok">Оплата прошла. Тариф обновится в течение минуты — если нет, обновите страницу.</Notice>}
+        {status === "success" && <Notice tone="warn">Вы вернулись со страницы оплаты. Это ещё не подтверждает списание: тариф активируется после проверки платежа провайдером. Обновите страницу, чтобы увидеть актуальный тариф.</Notice>}
         {status === "unavailable" && <Notice tone="warn">Оплата временно недоступна. Попробуйте позже или напишите нам.</Notice>}
-        {status === "fail" && <Notice tone="danger">Оплата не прошла. Деньги не списаны. Попробуйте ещё раз или другой способ оплаты.</Notice>}
+        {status === "fail" && <Notice tone="danger">Платёж не подтверждён на этой странице. Проверьте статус в истории оплат, прежде чем повторять покупку.</Notice>}
         {company.country === "BY" && (
           <Notice tone="warn">Оплата в BYN появится после подключения платёжного провайдера. Цены ниже ориентировочные и подтверждаются при запуске оплаты.</Notice>
         )}
