@@ -286,7 +286,10 @@ async function findDuplicate(key: string, companyId: string): Promise<{ card: Ca
   const tx = (await db.select().from(schema.transactions).where(eq(schema.transactions.idempotencyKey, key)).limit(1))[0];
   if (!tx) return null;
   if (tx.companyId !== companyId) throw new ForbiddenError("Ключ операции уже использован.");
-  const card = (await db.select().from(schema.cards).where(eq(schema.cards.id, tx.cardId)).limit(1))[0];
+  // An idempotent replay must never return a card from another company or a missing card.
+  const card = (await db.select().from(schema.cards)
+    .where(and(eq(schema.cards.id, tx.cardId), eq(schema.cards.companyId, companyId))).limit(1))[0];
+  if (!card) throw new AppError("IDEMPOTENCY_CONFLICT", "Невозможно безопасно повторить операцию.", 409);
   return { card, transaction: tx, duplicated: true };
 }
 
