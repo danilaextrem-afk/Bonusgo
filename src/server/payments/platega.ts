@@ -107,6 +107,13 @@ export async function verifyPlategaTransaction(transactionId: string): Promise<V
   // Never activate when Platega omits the currency or reports another currency.
   if (tx.status === "CONFIRMED" && currency !== "RUB") return null;
   if (tx.status === "CONFIRMED") return { ok: true, invoiceNo: p.invoiceNo, amountMinor: amount, currency, kind: "paid", providerRef: transactionId, raw };
+  // A full chargeback is a reversal of an already confirmed transaction.
+  // Read it from the current provider status, not from the untrusted callback body.
+  if (tx.status === "CHARGEBACKED" && currency === "RUB")
+    return { ok: true, invoiceNo: p.invoiceNo, amountMinor: amount, currency, kind: "refunded", providerRef: transactionId, raw };
+  // A partial refund / dispute needs a separate accounting policy. Never treat
+  // either as a fresh payment or a full refund.
+  if (tx.status === "PARTIALLY_REFUNDED" || tx.status === "DISPUTED") return null;
   if (tx.status === "CANCELED" || tx.status === "EXPIRED" || tx.status === "FAILED")
     return { ok: true, invoiceNo: p.invoiceNo, amountMinor: p.amountMinor, kind: "failed", failReason: `platega_${tx.status.toLowerCase()}`, providerRef: transactionId, raw };
   return null; // PENDING or unknown: nothing to do yet
