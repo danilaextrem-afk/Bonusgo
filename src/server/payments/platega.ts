@@ -1,18 +1,31 @@
 import "server-only";
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { PaymentError, appUrl, formatMajor, type PaymentProvider, type VerifiedNotification } from "./types";
 
 /**
- * Platega.io (RU, RUB). Docs: platega-io.gitbook.io/platega.io-api-dokumentaciya
- * - Create: POST /transaction/process with X-MerchantId / X-Secret headers → { transactionId, redirect }
- * - Callback: POST to our URL with the SAME X-MerchantId / X-Secret headers and no body signature,
- *   so the callback is only a hint: we always re-read the transaction from the API before acting.
- * Only official methods are allowed: 2 = СБП (QR НСПК), 10 = карты РФ (3DS). P2P methods are never used.
+ * Platega.io, RUB: https://docs.platega.io/ (checked 2026-11-19).
+ * Create: POST /transaction/process WITHOUT id; provider generates transactionId.
+ * Callback is only a hint; the status is always re-read from Platega before fulfilment.
+ * Live activation requires an explicit environment flag and verified merchant setup.
+ * Current approved merchant method: 2 = СБП (QR НСПК).
  */
 const BASE = (process.env.PLATEGA_API_URL ?? "https://app.platega.io").replace(/\/$/, "");
-const ALLOWED_METHODS = new Set([2, 10]);
+export const PLATEGA_MAX_MINOR = 10_000_00;
+const ALLOWED_METHODS = new Set([2]);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const realSupport = () => {
+  const email = process.env.CONTACT_EMAIL?.trim() ?? "";
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !email.endsWith(".example");
+};
+export const plategaLiveReady = () =>
+  plategaConfigured() &&
+  process.env.PLATEGA_LIVE_ENABLED === "true" &&
+  process.env.PAYMENTS_TEST_MODE !== "true" &&
+  process.env.DEMO_MODE === "false" &&
+  realSupport() &&
+  Boolean(process.env.OWNER_NAME?.trim() && process.env.OWNER_TAX_ID?.trim() && process.env.OWNER_ADDRESS?.trim());
 
 export const plategaConfigured = () => Boolean(process.env.PLATEGA_MERCHANT_ID && process.env.PLATEGA_SECRET);
 
@@ -40,34 +53,38 @@ export function plategaCallbackAuthorized(h: Headers): boolean {
 export const platega: PaymentProvider = {
   id: "platega",
   isConfigured: plategaConfigured,
-  isLive: plategaConfigured,
-  async createCheckout(payment) {
-    if (!plategaConfigured()) throw new PaymentError("Platega не настроена", "provider_not_configured");
-    const id = randomUUID();
-    // Store our transaction id first: the callback is matched by it.
-    await db.update(schema.payments).set({ providerRef: id }).where(eq(schema.payments.id, payment.id));
+  isLive: plategaLiveReady,
+  async createCheckout(payment, _company, payer) {
+    if (!plategaLiveReady()) throw new PaymentError("Platega пока не готова к приёму реальных платежей", "provider_not_ready");
+    if (payment.currency !== "RUB" || !Number.isSafeInteger(payment.amountMinor) || payment.amountMinor <= 0 || payment.amountMinor > PLATEGA_MAX_MINOR)
+      throw new PaymentError("Максимальная сумма одного платежа Platega — 10 000 ₽", "platega_amount_limit");
+    if (!payer || !UUID.test(payer.id) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payer.email))
+      throw new PaymentError("Нужен email владельца для оформления платежа", "payer_contact_required");
     const res = await fetch(`${BASE}/transaction/process`, {
       method: "POST",
       headers: headers(),
       body: JSON.stringify({
         paymentMethod: method(),
-        id,
         paymentDetails: { amount: Number(formatMajor(payment.amountMinor)), currency: payment.currency },
         description: `Подписка QRonus ${payment.plan}, ${payment.months} мес. (счёт ${payment.invoiceNo})`,
         return: appUrl("/app/billing?status=success"),
         failedUrl: appUrl("/app/billing?status=fail"),
         payload: String(payment.invoiceNo),
+        metadata: { userId: payer.id, user_email: payer.email },
       }),
       signal: AbortSignal.timeout(15_000),
     });
     const text = await res.text();
     if (!res.ok) throw new PaymentError(`Platega: HTTP ${res.status} ${text.slice(0, 150)}`, "provider_error");
     const body = JSON.parse(text) as { redirect?: string; transactionId?: string };
-    if (!body.redirect || !/^https:\/\//.test(body.redirect)) throw new PaymentError("Platega не вернула ссылку на оплату", "provider_error");
-    if (body.transactionId && body.transactionId !== id) {
-      await db.update(schema.payments).set({ providerRef: body.transactionId }).where(eq(schema.payments.id, payment.id));
-    }
-    return { redirectUrl: body.redirect };
+    if (!body.transactionId || !UUID.test(body.transactionId))
+      throw new PaymentError("Platega не вернула идентификатор транзакции", "provider_error");
+    let redirect: URL;
+    try { redirect = new URL(body.redirect ?? ""); } catch { throw new PaymentError("Platega не вернула ссылку на оплату", "provider_error"); }
+    if (redirect.protocol !== "https:" || redirect.hostname !== "pay.platega.io" || redirect.username || redirect.password)
+      throw new PaymentError("Platega вернула недопустимый адрес оплаты", "provider_error");
+    await db.update(schema.payments).set({ providerRef: body.transactionId }).where(eq(schema.payments.id, payment.id));
+    return { redirectUrl: redirect.href };
   },
   // Not used directly: callbacks go through verifyPlategaTransaction (server-side re-check).
   verifyNotification: () => ({ ok: false, invoiceNo: NaN, amountMinor: 0, kind: "paid", raw: {} }),
@@ -77,16 +94,18 @@ type PlategaTx = { id: string; status: string; paymentDetails?: { amount?: numbe
 
 /** Re-reads the transaction from Platega and turns it into a verified notification for our pipeline. */
 export async function verifyPlategaTransaction(transactionId: string): Promise<VerifiedNotification | null> {
-  if (!/^[0-9a-f-]{36}$/i.test(transactionId)) return null;
+  if (!UUID.test(transactionId) || !plategaConfigured()) return null;
   const [p] = await db.select().from(schema.payments).where(eq(schema.payments.providerRef, transactionId)).limit(1);
   if (!p || p.provider !== "platega") return null;
   const res = await fetch(`${BASE}/transaction/${encodeURIComponent(transactionId)}`, { headers: headers(), signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`Platega status HTTP ${res.status}`);
   const tx = (await res.json()) as PlategaTx;
-  if (tx.id && tx.id !== transactionId) return null;
+  if (tx.id !== transactionId) return null;
   const amount = Math.round(Number(tx.paymentDetails?.amount ?? NaN) * 100);
-  const currency = tx.paymentDetails?.currency === "RUB" || tx.paymentDetails?.currency === "BYN" ? tx.paymentDetails.currency : undefined;
+  const currency = tx.paymentDetails?.currency === "RUB" ? "RUB" : undefined;
   const raw = { transactionId, status: tx.status, amount: tx.paymentDetails?.amount ?? null, currency: tx.paymentDetails?.currency ?? null };
+  // Never activate when Platega omits the currency or reports another currency.
+  if (tx.status === "CONFIRMED" && currency !== "RUB") return null;
   if (tx.status === "CONFIRMED") return { ok: true, invoiceNo: p.invoiceNo, amountMinor: amount, currency, kind: "paid", providerRef: transactionId, raw };
   if (tx.status === "CANCELED" || tx.status === "EXPIRED" || tx.status === "FAILED")
     return { ok: true, invoiceNo: p.invoiceNo, amountMinor: p.amountMinor, kind: "failed", failReason: `platega_${tx.status.toLowerCase()}`, providerRef: transactionId, raw };
