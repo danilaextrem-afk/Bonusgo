@@ -54,10 +54,10 @@ export default async function LedgerAdminPage({
           maxLength={22}
           defaultValue={requested}
           autoComplete="off"
-          className="w-full rounded-lg border border-line bg-transparent p-3 font-mono text-sm"
+          className="input font-mono"
           placeholder="22 символа"
         />
-        <button type="submit" className="rounded-lg bg-primary px-4 py-2 font-semibold text-white">
+        <button type="submit" className="btn-primary">
           Проверить баланс
         </button>
         <p className="text-xs text-muted">Не более пяти запросов за минуту на администратора.</p>
