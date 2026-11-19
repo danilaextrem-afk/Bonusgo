@@ -6,6 +6,7 @@ import { db, schema } from "@/server/db";
 import { confirmReferral } from "@/server/loyalty/service";
 import { PROVIDERS, providerFor } from "./registry";
 import { issueSbpReceipt as issuePaymentReceipt } from "./sbp";
+import { PLATEGA_MAX_MINOR } from "./platega";
 import { PaymentError, testModeOn, testPaymentsMayActivate, type ProviderId, type VerifiedNotification } from "./types";
 
 export type PaidPlan = "PRO" | "TOP";
@@ -19,12 +20,19 @@ export function priceFor(country: CountryCode, plan: PaidPlan, months: Months): 
 export { addMonths } from "./dates";
 import { addMonths } from "./dates";
 
-export async function createPaymentOrder(companyId: string, plan: PaidPlan, months: Months) {
+export async function createPaymentOrder(companyId: string, plan: PaidPlan, months: Months, payer?: { id: string; email: string }) {
   if (plan !== "PRO" && plan !== "TOP") throw new PaymentError("Неизвестный тариф", "bad_plan");
   if (![1, 3, 12].includes(months)) throw new PaymentError("Недопустимый срок", "bad_months");
   const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, companyId)).limit(1);
   if (!company || company.deletedAt) throw new PaymentError("Компания не найдена", "no_company");
   const provider = providerFor(company.country);
+  const amountMinor = priceFor(company.country, plan, months);
+  if (provider.id === "platega" && amountMinor > PLATEGA_MAX_MINOR) {
+    throw new PaymentError("Один платёж через Platega не может превышать 10 000 ₽. Выберите меньший срок.", "platega_amount_limit");
+  }
+  if (provider.id === "platega" && !payer) {
+    throw new PaymentError("Нужен контакт плательщика для оплаты", "payer_contact_required");
+  }
   // Manual SBP transfers are always real money; other providers are test unless live.
   const test = provider.id === "sbp" ? false : testModeOn() || !provider.isLive();
   if (!provider.isConfigured() || (provider.id !== "mock" && !testModeOn() && !provider.isLive())) {
@@ -32,10 +40,10 @@ export async function createPaymentOrder(companyId: string, plan: PaidPlan, mont
   }
   const [payment] = await db
     .insert(schema.payments)
-    .values({ companyId, provider: provider.id, plan, months, amountMinor: priceFor(company.country, plan, months), currency: COUNTRY[company.country].currency, status: "PENDING", testMode: test })
+    .values({ companyId, provider: provider.id, plan, months, amountMinor, currency: COUNTRY[company.country].currency, status: "PENDING", testMode: test })
     .returning();
   try {
-    const { redirectUrl } = await provider.createCheckout(payment, company);
+    const { redirectUrl } = await provider.createCheckout(payment, company, payer);
     return { paymentId: payment.id, invoiceNo: payment.invoiceNo, redirectUrl };
   } catch (e) {
     await db.update(schema.payments).set({ status: "FAILED", failReason: e instanceof Error ? e.message.slice(0, 200) : "checkout_error" }).where(eq(schema.payments.id, payment.id));
