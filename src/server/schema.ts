@@ -151,6 +151,8 @@ export const transactions = pgTable("transactions", {
   purchaseMinor: integer("purchase_minor"),
   staffUserId: text("staff_user_id"),
   idempotencyKey: text("idempotency_key").notNull().unique(),
+  // Nullable only for transactions that predate the intent-fingerprint rollout.
+  intentHash: text("intent_hash"),
   note: text("note"),
   createdAt: created(),
 }, (t) => [
