@@ -12,3 +12,16 @@ export function parsePlategaCheckoutResponse(text: string): { transactionId?: st
     return null;
   }
 }
+
+/** Only accept the official HTTPS checkout origin; never forward users to arbitrary URLs. */
+export function parsePlategaCheckoutUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.hostname !== "pay.platega.io" ||
+        url.port !== "" || url.username !== "" || url.password !== "") return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
