@@ -38,7 +38,7 @@ export function PricingCards({ country }: { country: CP }) {
               {limits.advancedAnalytics && <li className="flex gap-2"><Icon name="check" size={16} className="mt-0.5 shrink-0 text-neon" />Расширенная аналитика</li>}
               {limits.automation && <li className="flex gap-2"><Icon name="check" size={16} className="mt-0.5 shrink-0 text-neon" />Автоматизация и экспорт</li>}
             </ul>
-            <Link href={registerHref(country, p.id === "FREE" ? {} : { plan: p.id })} className={`${p.highlight ? "btn-primary" : "btn-ghost"} mt-6`}>
+            <Link href={registerHref(country, p.id === "FREE" ? { role: "business" } : { role: "business", plan: p.id })} className={`${p.highlight ? "btn-primary" : "btn-ghost"} mt-6`}>
               {p.id === "FREE" ? "Начать бесплатно" : `Купить ${p.name} — перейти к регистрации`}
             </Link>
           </article>
