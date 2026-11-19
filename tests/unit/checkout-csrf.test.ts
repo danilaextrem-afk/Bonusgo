@@ -5,7 +5,7 @@ vi.mock("@/server/auth/session", () => ({
   verifyCsrf: vi.fn(async (csrf: string | null | undefined) => csrf === "valid-session-token"),
 }));
 vi.mock("@/server/tenancy", () => ({
-  requireMembership: vi.fn(async () => ({ membership: { role: "OWNER" } })),
+  requireMembership: vi.fn(async () => ({ user: { id: "user-1", email: "owner@example.test" }, membership: { role: "OWNER" } })),
 }));
 vi.mock("@/server/payments/service", () => ({
   createPaymentOrder: vi.fn(async () => ({ redirectUrl: "https://checkout.example.test/session" })),
@@ -54,7 +54,7 @@ describe("subscription checkout CSRF enforcement", () => {
     expect(assertSameOrigin).toHaveBeenCalledWith(request);
     expect(verifyCsrf).toHaveBeenCalledWith("valid-session-token");
     expect(requireMembership).toHaveBeenCalledWith("company-1", ["OWNER"]);
-    expect(createPaymentOrder).toHaveBeenCalledWith("company-1", "TOP", 3);
+    expect(createPaymentOrder).toHaveBeenCalledWith("company-1", "TOP", 3, { id: "user-1", email: "owner@example.test" });
   });
 
   it("rejects cross-origin requests before checking CSRF", async () => {
