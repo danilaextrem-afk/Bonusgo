@@ -3,7 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { PaymentError, appUrl, formatMajor, parseMinor, type PaymentProvider, type VerifiedNotification } from "./types";
-import { parsePlategaCheckoutResponse } from "./platega-response";
+import { parsePlategaCheckoutResponse, parsePlategaCheckoutUrl } from "./platega-response";
 
 /**
  * Platega.io, RUB: https://docs.platega.io/ (checked 2026-11-19).
@@ -83,12 +83,10 @@ export const platega: PaymentProvider = {
     if (!body) throw new PaymentError("Platega вернула некорректный ответ", "provider_error");
     if (!body.transactionId || !UUID.test(body.transactionId))
       throw new PaymentError("Platega не вернула идентификатор транзакции", "provider_error");
-    let redirect: URL;
-    try { redirect = new URL(body.redirect ?? ""); } catch { throw new PaymentError("Platega не вернула ссылку на оплату", "provider_error"); }
-    if (redirect.protocol !== "https:" || redirect.hostname !== "pay.platega.io" || redirect.username || redirect.password)
-      throw new PaymentError("Platega вернула недопустимый адрес оплаты", "provider_error");
+    const redirect = parsePlategaCheckoutUrl(body.redirect);
+    if (!redirect) throw new PaymentError("Platega вернула недопустимый адрес оплаты", "provider_error");
     await db.update(schema.payments).set({ providerRef: body.transactionId }).where(eq(schema.payments.id, payment.id));
-    return { redirectUrl: redirect.href };
+    return { redirectUrl: redirect };
   },
   // Not used directly: callbacks go through verifyPlategaTransaction (server-side re-check).
   verifyNotification: () => ({ ok: false, invoiceNo: NaN, amountMinor: 0, kind: "paid", raw: {} }),
