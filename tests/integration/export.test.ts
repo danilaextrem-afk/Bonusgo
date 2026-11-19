@@ -60,6 +60,20 @@ describe("complete company CSV exports", () => {
       .rejects.toMatchObject({ code: "PLAN_LIMIT", status: 402 });
   });
 
+  it("refuses to export another company's card or transaction history", async () => {
+    const ownerA = await makeSetup({ plan: "TOP" });
+    const ownerB = await makeSetup({ plan: "TOP" });
+    await createSession(ownerA.owner.id);
+    for (const kind of ["cards", "transactions"]) {
+      const url = `http://localhost:3000/api/app/export?companyId=${ownerB.company.id}&kind=${kind}`;
+      const response = await downloadCsv(new Request(url));
+      expect(response.status).toBe(403);
+      expect(response.headers.get("content-type")).toContain("application/json");
+      const body = await response.json();
+      expect(body.error).toBe("FORBIDDEN");
+    }
+  });
+
   it("downloads either CSV with exactly one UTF-8 BOM; rejects invalid kinds", async () => {
     const setup = await makeSetup({ plan: "TOP" });
     await createSession(setup.owner.id);
