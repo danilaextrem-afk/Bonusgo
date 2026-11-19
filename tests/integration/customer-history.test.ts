@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/headers", async () => (await import("./helpers")).nextHeadersMock);
 vi.mock("next/navigation", async () => (await import("./helpers")).nextNavigationMock);
 
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { listCustomerHistory } from "@/server/loyalty/customer-history";
 import { joinProgram } from "@/server/loyalty/service";
@@ -53,7 +53,13 @@ describe("authenticated account-scoped full history", () => {
     expect(pageSizes).toEqual([20, 20, 7]);
     expect(new Set(seen).size).toBe(47);
     expect([...seen].sort()).toEqual(own.map((row) => row.id).sort());
-    expect(seen).toEqual([...seen].sort().reverse());
+    // PostgreSQL text collation is not necessarily JavaScript UTF-16 sorting.
+    // Compare against the database's actual stable (created_at, id) order.
+    const expectedOrder = await db.select({ id: schema.transactions.id })
+      .from(schema.transactions)
+      .where(inArray(schema.transactions.cardId, [a.id, b.id]))
+      .orderBy(desc(schema.transactions.createdAt), desc(schema.transactions.id));
+    expect(seen).toEqual(expectedOrder.map((row) => row.id));
     expect(await listCustomerHistory((await makeUser()).id)).toEqual({ items: [], nextCursor: null });
   });
 
