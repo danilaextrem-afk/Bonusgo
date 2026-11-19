@@ -127,6 +127,17 @@ describe("Platega", () => {
     expect(after.plan).toBe("FREE");
   });
 
+  it("does not round a provider amount with three fractional digits into a valid payment", async () => {
+    const { c, p } = await checkout();
+    fetchMock.mockImplementation(async () => json({
+      id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 990.001, currency: "RUB" },
+    }));
+    expect((await cb({ id: p.providerRef })).status).toBe(200);
+    expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("FREE");
+    expect((await db.select().from(schema.payments).where(eq(schema.payments.id, p.id)))[0].status).toBe("PENDING");
+    expect(await db.select().from(schema.paymentEvents)).toHaveLength(0);
+  });
+
   it("marks canceled payments as FAILED", async () => {
     const { p } = await checkout();
     fetchMock.mockImplementation(async () => json({ id: p.providerRef, status: "CANCELED", paymentDetails: { amount: 990, currency: "RUB" } }));
