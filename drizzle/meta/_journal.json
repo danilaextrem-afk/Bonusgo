@@ -29,6 +29,13 @@
       "when": 1795098000000,
       "tag": "0003_transaction_card_history_index",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795098060000,
+      "tag": "0004_cards_customer_index",
+      "breakpoints": true
     }
   ]
 }
