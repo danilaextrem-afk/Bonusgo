@@ -39,7 +39,7 @@ export function PricingCards({ country }: { country: CP }) {
               {limits.automation && <li className="flex gap-2"><Icon name="check" size={16} className="mt-0.5 shrink-0 text-neon" />Автоматизация и экспорт</li>}
             </ul>
             <Link href={registerHref(country, p.id === "FREE" ? {} : { plan: p.id })} className={`${p.highlight ? "btn-primary" : "btn-ghost"} mt-6`}>
-              {p.id === "FREE" ? "Начать бесплатно" : `Выбрать ${p.name}`}
+              {p.id === "FREE" ? "Начать бесплатно" : `Купить ${p.name} — перейти к регистрации`}
             </Link>
           </article>
         );
@@ -91,6 +91,8 @@ export function PaymentNote({ country }: { country: CP }) {
       <p className="font-semibold text-warn">Способ оплаты</p>
       <p className="mt-1 text-muted">{paymentNote(country)}.</p>
       <p className="mt-2 text-muted">Бесплатный тариф доступен без оплаты и без привязки карты.</p>
+      <p className="mt-2 text-muted">Как купить: выберите тариф → зарегистрируйтесь или войдите → откройте «Тариф и оплата» в кабинете → выберите срок и итоговую цену → нажмите «Оплатить». Если касса не подключена, сайт покажет сообщение о недоступности оплаты.</p>
+      <p className="mt-2 text-muted">При оплате через Platega максимальная сумма одной транзакции — 10 000 ₽. Для некоторых длительных периодов покупки через этот способ временно недоступны.</p>
     </div>
   );
 }
