@@ -295,6 +295,20 @@ async function findDuplicate(i: OpInput, key: string, expectedType: "ACCRUE" | "
   const card = (await db.select().from(schema.cards)
     .where(and(eq(schema.cards.id, tx.cardId), eq(schema.cards.companyId, i.companyId), eq(schema.cards.programId, i.programId))).limit(1))[0];
   if (!card) throw new AppError("IDEMPOTENCY_CONFLICT", "Ключ операции уже использован для другой программы или карта недоступна.", 409);
+
+  // A duplicate cannot be authenticated only by a reusable idempotency key.
+  // Require a QR token that was actually issued to this SAME customer.
+  // Consumed tokens remain queryable until routine expiration cleanup, so
+  // legitimate retries (including a newly issued QR for the same customer)
+  // still return the original result without consuming another token.
+  const bare = parseCustomerToken(i.customerToken);
+  if (!bare) throw new AppError("IDEMPOTENCY_CONFLICT", "Ключ операции уже использован с другим QR-кодом.", 409);
+  const tokenOwner = (await db.select({ userId: schema.customerTokens.userId })
+    .from(schema.customerTokens)
+    .where(eq(schema.customerTokens.tokenHash, sha256(bare)))
+    .limit(1))[0];
+  if (!tokenOwner || tokenOwner.userId !== card.customerId)
+    throw new AppError("IDEMPOTENCY_CONFLICT", "Ключ операции уже использован для другого клиента или QR-код недействителен.", 409);
   return { card, transaction: tx, duplicated: true };
 }
 
