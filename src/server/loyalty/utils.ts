@@ -31,6 +31,10 @@ export function computePoints(purchaseMinor: number, pointsPercent: number): num
 
 /** CSV cell with quoting and formula-injection neutralization (= + - @ \t \r). */
 export function csvCell(v: unknown): string {
+  // Genuine finite numbers (including negative debits) are safe CSV cells.
+  // Only text needs formula-injection escaping; treating numbers as text
+  // would break spreadsheets' sums and accounting reconciliation.
+  if (typeof v === "number") return Number.isFinite(v) ? String(v) : "";
   let s = v === null || v === undefined ? "" : v instanceof Date ? v.toISOString() : String(v);
   if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   if (/[",\n\r;]/.test(s) || s.startsWith("'")) s = '"' + s.replace(/"/g, '""') + '"';
