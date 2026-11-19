@@ -5,6 +5,7 @@ import { requirePlatformAdmin } from "@/server/auth/session";
 import { runAdminLedgerAudit } from "@/server/loyalty/admin-ledger";
 import { AppError } from "@/server/errors";
 import type { CompanyLedgerAudit } from "@/server/loyalty/ledger-audit";
+import type { BatchedLedgerAudit } from "@/server/loyalty/batched-ledger-audit";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -15,20 +16,21 @@ export const metadata: Metadata = {
 export default async function LedgerAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ companyId?: string }>;
+  searchParams: Promise<{ companyId?: string; mode?: string }>;
 }) {
   const admin = await requirePlatformAdmin();
   // This sensitive view requires the actual database admin role, never
   // the ADMIN_EMAILS developer/testing fallback.
   if (admin.platformRole !== "ADMIN") notFound();
 
-  const { companyId } = await searchParams;
+  const { companyId, mode } = await searchParams;
+  const batchMode = mode === "batched";
   const requested = typeof companyId === "string" ? companyId.trim() : "";
-  let report: CompanyLedgerAudit | null = null;
+  let report: CompanyLedgerAudit | BatchedLedgerAudit | null = null;
   let error: string | null = null;
   if (requested) {
     try {
-      report = await runAdminLedgerAudit(requested);
+      report = await runAdminLedgerAudit(requested, batchMode ? "batched" : "standard");
     } catch (e) {
       error = e instanceof AppError ? e.message : "Не удалось выполнить сверку. Повторите позже.";
     }
@@ -41,6 +43,7 @@ export default async function LedgerAdminPage({
       <p className="my-3 text-sm text-muted">
         Только для администратора платформы. Проверка читает базу данных и не меняет балансы.
         Не используйте результат как подтверждение денежных платежей.
+        Для крупных компаний выберите пакетную сверку: все страницы читаются из одного снимка БД.
       </p>
 
       <form method="get" action="/admin/ledger" className="card mb-5 space-y-3">
@@ -57,6 +60,11 @@ export default async function LedgerAdminPage({
           className="input font-mono"
           placeholder="22 символа"
         />
+        <label htmlFor="ledgerMode" className="block text-sm font-medium">Режим сверки</label>
+        <select id="ledgerMode" name="mode" className="input" defaultValue={batchMode ? "batched" : "standard"}>
+          <option value="standard">Стандартный — до 10 000 карт</option>
+          <option value="batched">Пакетный — до 50 000 карт</option>
+        </select>
         <button type="submit" className="btn-primary">
           Проверить баланс
         </button>
@@ -70,7 +78,7 @@ export default async function LedgerAdminPage({
           <p className="break-all text-sm text-muted">Компания: {report.companyId}</p>
           <p className="text-sm">
             Проверено карт: <strong>{report.cardsChecked}</strong>.
-            {" "}Расхождений: <strong>{report.discrepancies.length}</strong>.
+            {" "}Расхождений: <strong>{"discrepancyCount" in report ? report.discrepancyCount : report.discrepancies.length}</strong>.
           </p>
           {report.discrepancies.length === 0 ? (
             <p className="text-sm">По проверенным картам расхождений не обнаружено.</p>
@@ -101,8 +109,8 @@ export default async function LedgerAdminPage({
                   </tbody>
                 </table>
               </div>
-              {report.discrepancies.length > 50 && (
-                <p className="text-xs text-muted">Показаны первые 50 расхождений.</p>
+              {("discrepancyCount" in report ? report.discrepancyCount : report.discrepancies.length) > 50 && (
+                <p className="text-xs text-muted">Показаны первые 50 расхождений. Общее количество рассчитано полностью.</p>
               )}
             </>
           )}
