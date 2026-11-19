@@ -148,7 +148,11 @@ export const transactions = pgTable("transactions", {
   idempotencyKey: text("idempotency_key").notNull().unique(),
   note: text("note"),
   createdAt: created(),
-}, (t) => [index("tx_company_created").on(t.companyId, t.createdAt)]);
+}, (t) => [
+  index("tx_company_created").on(t.companyId, t.createdAt),
+  // Personal history queries keep the newest 20 operations per customer card.
+  index("tx_card_history_idx").on(t.cardId, t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst()),
+]);
 
 export const subscriptions = pgTable("subscriptions", {
   id: id(),
