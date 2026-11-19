@@ -282,14 +282,17 @@ async function prepareOp(i: OpInput) {
   return { key, membership: m, company, program };
 }
 
-async function findDuplicate(key: string, companyId: string): Promise<{ card: Card; transaction: Tx; duplicated: true } | null> {
+async function findDuplicate(i: OpInput, key: string, expectedType: "ACCRUE" | "REDEEM"): Promise<{ card: Card; transaction: Tx; duplicated: true } | null> {
   const tx = (await db.select().from(schema.transactions).where(eq(schema.transactions.idempotencyKey, key)).limit(1))[0];
   if (!tx) return null;
-  if (tx.companyId !== companyId) throw new ForbiddenError("Ключ операции уже использован.");
-  // An idempotent replay must never return a card from another company or a missing card.
+  if (tx.companyId !== i.companyId) throw new ForbiddenError("Ключ операции уже использован.");
+  // Retrying a request is safe only within the same actor, action and program.
+  // A reused key must not silently return an unrelated payment/loyalty operation.
+  if (tx.staffUserId !== i.actorUserId || tx.type !== expectedType)
+    throw new AppError("IDEMPOTENCY_CONFLICT", "Ключ операции уже использован для другого действия.", 409);
   const card = (await db.select().from(schema.cards)
-    .where(and(eq(schema.cards.id, tx.cardId), eq(schema.cards.companyId, companyId))).limit(1))[0];
-  if (!card) throw new AppError("IDEMPOTENCY_CONFLICT", "Невозможно безопасно повторить операцию.", 409);
+    .where(and(eq(schema.cards.id, tx.cardId), eq(schema.cards.companyId, i.companyId), eq(schema.cards.programId, i.programId))).limit(1))[0];
+  if (!card) throw new AppError("IDEMPOTENCY_CONFLICT", "Ключ операции уже использован для другой программы или карта недоступна.", 409);
   return { card, transaction: tx, duplicated: true };
 }
 
@@ -308,9 +311,10 @@ async function runOp(
   i: OpInput,
   body: (tx: DbTx, ctx: Awaited<ReturnType<typeof prepareOp>>, card: Card) => Promise<{ amount: number; type: "ACCRUE" | "REDEEM"; purchaseMinor?: number; note?: string }>,
   action: string,
+  expectedType: "ACCRUE" | "REDEEM",
 ) {
   const ctx = await prepareOp(i);
-  const dup = await findDuplicate(ctx.key, i.companyId);
+  const dup = await findDuplicate(i, ctx.key, expectedType);
   if (dup) return dup;
   const rl = await rateLimit(`staff-op:${i.actorUserId}`, 60, 60);
   if (!rl.ok) throw new AppError("RATE_LIMITED", "Слишком много операций. Подождите минуту.", 429);
@@ -334,7 +338,7 @@ async function runOp(
     return out;
   } catch (e) {
     if (isUniqueViolation(e)) {
-      const d = await findDuplicate(ctx.key, i.companyId);
+      const d = await findDuplicate(i, ctx.key, expectedType);
       if (d) return d;
     }
     throw e;
@@ -350,7 +354,7 @@ export async function accrue(i: OpInput & { purchaseMinor?: number; stamps?: num
     const purchase = intIn(i.purchaseMinor, 1, MAX_PURCHASE_MINOR, "Сумма покупки указана неверно.");
     const pts = computePoints(purchase, program.pointsPercent);
     return { type: "ACCRUE", amount: pts, purchaseMinor: purchase };
-  }, "card.accrue");
+  }, "card.accrue", "ACCRUE");
 }
 
 export async function redeem(i: OpInput & { rewardId?: string }): Promise<{ card: Card; transaction: Tx; duplicated: boolean }> {
@@ -365,7 +369,7 @@ export async function redeem(i: OpInput & { rewardId?: string }): Promise<{ card
     if (!reward) throw new NotFoundError("Награда не найдена.");
     if (card.balance < reward.cost) throw new AppError("INSUFFICIENT_BALANCE", `Недостаточно баллов: ${card.balance} из ${reward.cost}.`);
     return { type: "REDEEM", amount: -reward.cost, note: reward.title };
-  }, "card.redeem");
+  }, "card.redeem", "REDEEM");
 }
 
 // ───────────────────────── Business reads ─────────────────────────
