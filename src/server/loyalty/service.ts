@@ -9,6 +9,7 @@ import { rateLimit } from "@/server/security/rateLimit";
 import { trackEvent } from "./analytics";
 import { MAX_EXPORT_ROWS, assertCompleteExport } from "./export-limits";
 import { parseExportPeriod } from "./export-period";
+import { loyaltyIntentFingerprint } from "./intent-fingerprint";
 import { assertCanAddProgram, assertCanAddStaff, assertCanAddVenue, assertFeature, assertOperationAllowed, brandingAllowed, effectivePlan, withLimitLock } from "@/server/limits";
 import { ACTIVE_CUSTOMER_DAYS, COUNTRY, PLAN_LIMITS, PLAN_PRICES, type CountryCode } from "@/lib/plans";
 import { MAX_PURCHASE_MINOR, computePoints, csvRow, isValidColor, isValidLogoUrl, maskEmail, parseCustomerToken, slugify } from "./utils";
@@ -284,7 +285,32 @@ async function prepareOp(i: OpInput) {
   return { key, membership: m, company, program };
 }
 
-async function findDuplicate(i: OpInput, key: string, expectedType: "ACCRUE" | "REDEEM"): Promise<{ card: Card; transaction: Tx; duplicated: true } | null> {
+/** Canonicalize the effective request before looking up an idempotency key.
+ * The original request hash is compared against every retry. Never re-price
+ * a historical transaction after a reward or loyalty program has changed.
+ */
+function requestIntentHash(
+  i: OpInput & { purchaseMinor?: number; stamps?: number; rewardId?: string },
+  program: typeof schema.programs.$inferSelect,
+  action: "ACCRUE" | "REDEEM",
+): string {
+  if (action === "ACCRUE") {
+    if (program.type === "STAMPS") {
+      const stamps = intIn(i.stamps ?? 1, 1, 5, "За один раз можно начислить от 1 до 5 штампов.");
+      return loyaltyIntentFingerprint({ action, programId: program.id, kind: "stamps", value: stamps });
+    }
+    const purchase = intIn(i.purchaseMinor, 1, MAX_PURCHASE_MINOR, "Сумма покупки указана неверно.");
+    return loyaltyIntentFingerprint({ action, programId: program.id, kind: "purchase", value: purchase });
+  }
+  if (program.type === "STAMPS") {
+    return loyaltyIntentFingerprint({ action, programId: program.id, kind: "stamp-reward", value: null });
+  }
+  if (typeof i.rewardId !== "string" || i.rewardId.length === 0)
+    throw new AppError("VALIDATION", "Выберите награду.");
+  return loyaltyIntentFingerprint({ action, programId: program.id, kind: "reward", value: i.rewardId });
+}
+
+async function findDuplicate(i: OpInput, key: string, expectedType: "ACCRUE" | "REDEEM", intentHash: string): Promise<{ card: Card; transaction: Tx; duplicated: true } | null> {
   const tx = (await db.select().from(schema.transactions).where(eq(schema.transactions.idempotencyKey, key)).limit(1))[0];
   if (!tx) return null;
   if (tx.companyId !== i.companyId) throw new ForbiddenError("Ключ операции уже использован.");
@@ -292,6 +318,10 @@ async function findDuplicate(i: OpInput, key: string, expectedType: "ACCRUE" | "
   // A reused key must not silently return an unrelated payment/loyalty operation.
   if (tx.staffUserId !== i.actorUserId || tx.type !== expectedType)
     throw new AppError("IDEMPOTENCY_CONFLICT", "Ключ операции уже использован для другого действия.", 409);
+  // Legacy rows have no trustworthy request fingerprint and must fail closed.
+  // Never guess the original reward ID, amount or stamp count from the balance.
+  if (tx.intentHash !== intentHash)
+    throw new AppError("IDEMPOTENCY_CONFLICT", "Ключ операции уже использован для других параметров.", 409);
   const card = (await db.select().from(schema.cards)
     .where(and(eq(schema.cards.id, tx.cardId), eq(schema.cards.companyId, i.companyId), eq(schema.cards.programId, i.programId))).limit(1))[0];
   if (!card) throw new AppError("IDEMPOTENCY_CONFLICT", "Ключ операции уже использован для другой программы или карта недоступна.", 409);
@@ -324,13 +354,14 @@ async function consumeToken(tx: DbTx, raw: string): Promise<string> {
 }
 
 async function runOp(
-  i: OpInput,
+  i: OpInput & { purchaseMinor?: number; stamps?: number; rewardId?: string },
   body: (tx: DbTx, ctx: Awaited<ReturnType<typeof prepareOp>>, card: Card) => Promise<{ amount: number; type: "ACCRUE" | "REDEEM"; purchaseMinor?: number; note?: string }>,
   action: string,
   expectedType: "ACCRUE" | "REDEEM",
 ) {
   const ctx = await prepareOp(i);
-  const dup = await findDuplicate(i, ctx.key, expectedType);
+  const intentHash = requestIntentHash(i, ctx.program, expectedType);
+  const dup = await findDuplicate(i, ctx.key, expectedType, intentHash);
   if (dup) return dup;
   const rl = await rateLimit(`staff-op:${i.actorUserId}`, 60, 60);
   if (!rl.ok) throw new AppError("RATE_LIMITED", "Слишком много операций. Подождите минуту.", 429);
@@ -345,7 +376,7 @@ async function runOp(
       const [card] = await tx.update(schema.cards).set({ balance: sql`${schema.cards.balance} + ${op.amount}`, lastActivityAt: now }).where(eq(schema.cards.id, ensured.card.id)).returning();
       if (card.balance < 0) throw new AppError("INSUFFICIENT_BALANCE", "Недостаточно баллов.");
       const [transaction] = await tx.insert(schema.transactions).values({
-        companyId: i.companyId, cardId: card.id, type: op.type, amount: op.amount, purchaseMinor: op.purchaseMinor ?? null, staffUserId: i.actorUserId, idempotencyKey: ctx.key, note: op.note ?? null,
+        companyId: i.companyId, cardId: card.id, type: op.type, amount: op.amount, purchaseMinor: op.purchaseMinor ?? null, staffUserId: i.actorUserId, idempotencyKey: ctx.key, intentHash, note: op.note ?? null,
       }).returning();
       return { card, transaction, duplicated: false as boolean };
     });
@@ -354,7 +385,7 @@ async function runOp(
     return out;
   } catch (e) {
     if (isUniqueViolation(e)) {
-      const d = await findDuplicate(i, ctx.key, expectedType);
+      const d = await findDuplicate(i, ctx.key, expectedType, intentHash);
       if (d) return d;
     }
     throw e;
