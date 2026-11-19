@@ -41,7 +41,7 @@ export async function runAdminLedgerAudit(
   const report = mode === "batched"
     ? await auditCompanyLedgerBatched(company.id)
     : await auditCompanyLedger(company.id);
-  const discrepancyCount = "discrepancyCount" in report
+  const discrepancyCount = "discrepancyCount" in report && typeof report.discrepancyCount === "number"
     ? report.discrepancyCount
     : report.discrepancies.length;
   // Store only summary counts, never customer details, card identifiers or tokens.
