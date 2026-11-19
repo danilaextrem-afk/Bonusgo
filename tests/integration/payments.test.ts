@@ -107,6 +107,37 @@ describe("payments pipeline", () => {
     expect(audit).toHaveBeenCalledWith("error.payment_amount_mismatch", expect.anything());
   });
 
+  it("a wrong amount or currency cannot consume the paid notification key", async () => {
+    const c = await company();
+    const { p } = await order(c.id, "PRO", 1);
+
+    expect(await note(p, "paid", p.amountMinor - 1)).toEqual({ ok: false, reason: "amount_mismatch" });
+    expect(await processNotification("mock", {
+      ok: true, invoiceNo: p.invoiceNo, amountMinor: p.amountMinor, currency: "BYN", kind: "paid", raw: {},
+    })).toEqual({ ok: false, reason: "amount_mismatch" });
+    expect(await db.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.paymentId, p.id))).toHaveLength(0);
+    expect((await getCompany(c.id)).plan).toBe("FREE");
+
+    expect(await note(p)).toMatchObject({ ok: true, status: "PAID", changed: true });
+    expect((await getCompany(c.id)).plan).toBe("PRO");
+    expect(await note(p)).toEqual({ ok: true, duplicated: true });
+    expect(await db.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.paymentId, p.id))).toHaveLength(1);
+  });
+
+  it("a mismatched refund cannot block a later valid refund", async () => {
+    const c = await company();
+    const { p } = await order(c.id, "PRO", 1);
+    await note(p);
+
+    expect(await note(p, "refunded", p.amountMinor + 1)).toEqual({ ok: false, reason: "amount_mismatch" });
+    expect((await getCompany(c.id)).plan).toBe("PRO");
+    expect(await db.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.paymentId, p.id))).toHaveLength(1);
+
+    expect(await note(p, "refunded")).toMatchObject({ ok: true, status: "REFUNDED", changed: true });
+    expect((await getCompany(c.id)).plan).toBe("FREE");
+    expect(await db.select().from(schema.paymentEvents).where(eq(schema.paymentEvents.paymentId, p.id))).toHaveLength(2);
+  });
+
   it("unknown invoice and provider mismatch are rejected", async () => {
     expect(await note({ invoiceNo: 999999, amountMinor: 1 })).toEqual({ ok: false, reason: "unknown_payment" });
     const c = await company();
