@@ -12,6 +12,16 @@ describe("CSV escaping", () => {
     expect(csvCell(null)).toBe("");
     expect(csvRow(["a", 1, "b"])).toBe("a,1,b");
   });
+  it("keeps genuine signed numbers numeric but neutralizes numeric-looking strings", () => {
+    expect(csvCell(-3)).toBe("-3");
+    expect(csvCell(-42.5)).toBe("-42.5");
+    expect(csvRow(["REDEEM", -3, 100])).toBe("REDEEM,-3,100");
+    expect(csvCell("-3")).toBe('"\'-3"');
+    expect(csvCell("+3")).toBe('"\'+3"');
+    expect(csvCell("=1+1")).toBe('"\'=1+1"');
+    expect(csvCell(Number.NaN)).toBe("");
+    expect(csvCell(Infinity)).toBe("");
+  });
   it("leaves plain values alone", () => {
     expect(csvCell("Кофейня")).toBe("Кофейня");
     expect(csvCell(42)).toBe("42");
