@@ -85,7 +85,7 @@ test("core user journey", async ({ browser, baseURL }, testInfo) => {
   await expect(cp.getByText("Начисление", { exact: true })).toBeVisible();
   await expect(cp.getByText("+1", { exact: true })).toBeVisible();
   await cp.goto("/me/history?cursor=invalid");
-  await expect(cp.getByRole("alert")).toContainText("Недействительная ссылка");
+  await expect(cp.getByRole("alert").filter({ hasText: "Недействительная ссылка" })).toHaveCount(1);
   await cp.getByRole("link", { name: "Начать с первой страницы" }).click();
   await expect(cp.getByText("Начисление", { exact: true })).toBeVisible();
 
