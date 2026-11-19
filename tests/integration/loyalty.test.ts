@@ -414,3 +414,61 @@ describe("read-only ledger reconciliation", () => {
     expect((await auditCompanyLedger(b.company.id)).cardsChecked).toBe(0);
   });
 });
+
+describe("customer history across several bonus cards", () => {
+  it("isolates other customers and returns the newest 20 transactions per card", async () => {
+    const first = await makeSetup({ plan: "TOP" });
+    const second = await makeSetup({ plan: "TOP" });
+    const customer = await makeUser();
+    const stranger = await makeUser();
+
+    const cardA = await joinProgram(customer.id, first.program.id);
+    const cardB = await joinProgram(customer.id, second.program.id);
+    const strangerCard = await joinProgram(stranger.id, second.program.id);
+
+    const entries = [
+      ...Array.from({ length: 25 }, (_, i) => ({
+        companyId: first.company.id,
+        cardId: cardA.id,
+        type: "ACCRUE" as const,
+        amount: i + 1,
+        idempotencyKey: `multi-card-a-${i}`,
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, i)),
+      })),
+      ...Array.from({ length: 25 }, (_, i) => ({
+        companyId: second.company.id,
+        cardId: cardB.id,
+        type: "REDEEM" as const,
+        amount: -(i + 1),
+        idempotencyKey: `multi-card-b-${i}`,
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, i)),
+      })),
+      {
+        companyId: second.company.id,
+        cardId: strangerCard.id,
+        type: "ACCRUE" as const,
+        amount: 777,
+        idempotencyKey: "multi-card-outsider",
+        createdAt: new Date(Date.UTC(2026, 0, 1, 1, 0)),
+      },
+    ];
+    await db.insert(schema.transactions).values(entries);
+
+    const cards = await getCustomerCards(customer.id);
+    expect(cards).toHaveLength(2);
+    const a = cards.find((item) => item.card.id === cardA.id);
+    const b = cards.find((item) => item.card.id === cardB.id);
+    expect(a?.transactions.map((tx) => tx.amount)).toEqual(
+      Array.from({ length: 20 }, (_, i) => 25 - i),
+    );
+    expect(b?.transactions.map((tx) => tx.amount)).toEqual(
+      Array.from({ length: 20 }, (_, i) => -(25 - i)),
+    );
+    expect(a?.transactions.every((tx) => tx.type === "ACCRUE")).toBe(true);
+    expect(b?.transactions.every((tx) => tx.type === "REDEEM")).toBe(true);
+    expect(cards.flatMap((item) => item.transactions).some((tx) => tx.amount === 777)).toBe(false);
+    expect(await getCustomerCards(stranger.id)).toHaveLength(1);
+    expect((await getCustomerCards(stranger.id))[0].transactions.map((tx) => tx.amount)).toEqual([777]);
+    expect(await getCustomerCards((await makeUser()).id)).toEqual([]);
+  });
+});
