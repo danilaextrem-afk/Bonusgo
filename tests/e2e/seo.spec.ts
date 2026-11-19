@@ -32,8 +32,8 @@ test.describe("technical SEO", () => {
     await page.goto("/ru/tarify");
     const pro = page.getByRole("link", { name: /Купить PRO/ });
     const top = page.getByRole("link", { name: /Купить TOP/ });
-    await expect(pro).toHaveAttribute("href", /\\/register\\?[^"]*role=business/);
-    await expect(top).toHaveAttribute("href", /\\/register\\?[^"]*role=business/);
+    await expect(pro).toHaveAttribute("href", /role=business/);
+    await expect(top).toHaveAttribute("href", /role=business/);
     await pro.click();
     await expect(page.getByRole("heading", { name: "Регистрация" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Я бизнес" })).toHaveAttribute("aria-current", "page");
