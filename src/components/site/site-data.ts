@@ -46,6 +46,7 @@ export const STATIC_PAGES: { path: string; priority: number; changeFrequency: "w
   { path: "/partneram", priority: 0.5, changeFrequency: "monthly" },
   { path: "/kontakty", priority: 0.4, changeFrequency: "yearly" },
   { path: "/politika-konfidencialnosti", priority: 0.2, changeFrequency: "yearly" },
+  { path: "/oplata", priority: 0.4, changeFrequency: "monthly" },
   { path: "/usloviya", priority: 0.2, changeFrequency: "yearly" },
   { path: "/soglasie", priority: 0.2, changeFrequency: "yearly" },
   { path: "/cookies", priority: 0.2, changeFrequency: "yearly" },

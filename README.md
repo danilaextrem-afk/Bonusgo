@@ -7,7 +7,7 @@
 - TypeScript, Tailwind CSS 4
 - PostgreSQL + Drizzle ORM (миграции в `drizzle/`)
 - Vitest (unit и integration), Playwright (E2E, десктоп и Android-эмуляция)
-- GitHub Actions CI, Render (free web service) + Neon Postgres для демо-режима
+- GitHub Actions CI, Render + Neon для демо, Docker для целевого размещения в Yandex Cloud
 
 ## Структура
 | Путь | Что там |
@@ -16,7 +16,7 @@
 | `src/app/(app)` | Вход, регистрация, кабинет бизнеса `/app`, кабинет посетителя `/me`, админка `/admin`, страница заведения `/v/[slug]` |
 | `src/server/auth`, `security` | Сессии, CSRF/Origin, rate limit, заголовки безопасности |
 | `src/server/loyalty` | Начисление и списание (атомарно, одноразовые токены, идемпотентность) |
-| `src/server/payments` | Платёжный модуль: Robokassa (РФ), bePaid/WEBPAY (РБ), mock для тестов |
+| `src/server/payments` | Платёжный модуль: Platega и Robokassa (РФ), bePaid/WEBPAY (РБ), mock для тестов |
 | `src/lib/plans.ts` | Тарифы, лимиты и цены RUB/BYN, единственный источник |
 | `src/content` | SEO-страницы, база знаний, юридические тексты (черновики) |
 | `docs/` | Исследования (право, платежи, хостинг, SEO) и инструкции |
@@ -39,3 +39,6 @@ npm run lint && npm run typecheck && npm test && npm run build && npm run test:e
 - `PAYMENTS_TEST_MODE=true`: платежи только тестовые; боевой режим включается после договора с провайдером.
 
 Секреты задаются только в переменных окружения хостинга и никогда не попадают в репозиторий.
+
+
+Развёртывание описано в [инструкции для Yandex Cloud](docs/DEPLOY_YANDEX.md). Порядок согласования Platega описан [отдельно](docs/platega.md).

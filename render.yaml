@@ -5,11 +5,11 @@ services:
     runtime: node
     plan: free
     region: frankfurt
-    buildCommand: npm ci && npx drizzle-kit migrate && npm run build
-    startCommand: npm run start -- -p $PORT
+    buildCommand: npm ci && npm run build && npm run db:migrate
+    startCommand: npm run start -- -H 0.0.0.0 -p $PORT
     # No background jobs or DB access during Render process health checks.
     healthCheckPath: /api/live
-    autoDeploy: true
+    autoDeployTrigger: checksPass
     envVars:
       - key: NODE_VERSION
         value: "22"

@@ -14,7 +14,7 @@ export async function GET() {
     {
       ok: true,
       time: new Date().toISOString(),
-      revision: publicDeploymentRevision(process.env.RENDER_GIT_COMMIT),
+      revision: publicDeploymentRevision(process.env.RENDER_GIT_COMMIT ?? process.env.QRONUS_GIT_COMMIT),
     },
     { headers: { "Cache-Control": "no-store, max-age=0", "X-Robots-Tag": "noindex, nofollow" } },
   );

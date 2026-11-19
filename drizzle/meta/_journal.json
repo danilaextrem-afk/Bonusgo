@@ -43,6 +43,13 @@
       "when": 1795100000000,
       "tag": "0005_loyalty_intent_hash",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795118181827,
+      "tag": "0006_platega_checkout_idempotency",
+      "breakpoints": true
     }
   ]
 }

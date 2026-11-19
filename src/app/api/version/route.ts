@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
  */
 export function GET() {
   return NextResponse.json(
-    { revision: publicDeploymentRevision(process.env.RENDER_GIT_COMMIT) },
+    { revision: publicDeploymentRevision(process.env.RENDER_GIT_COMMIT ?? process.env.QRONUS_GIT_COMMIT) },
     {
       headers: {
         "Cache-Control": "no-store, max-age=0",

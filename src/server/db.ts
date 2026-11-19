@@ -9,9 +9,13 @@ const pool =
   new Pool({
     connectionString: process.env.DATABASE_URL,
     max: 5,
-    ssl: process.env.DATABASE_URL?.includes("sslmode=require") ? { rejectUnauthorized: false } : undefined,
+    connectionTimeoutMillis: 3_000,
   });
-if (process.env.NODE_ENV !== "production") g.pgPool = pool;
+if (!g.pgPool) {
+  // Idle clients can disconnect during failover. pg recycles them automatically.
+  pool.on("error", () => console.error("[postgres] idle connection lost"));
+  g.pgPool = pool;
+}
 
 export const db = drizzle(pool, { schema });
 export type DB = typeof db;

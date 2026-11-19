@@ -1,4 +1,5 @@
 // QRonus data model (Drizzle). Every business-owned row carries companyId for tenant isolation.
+import { sql } from "drizzle-orm";
 import { pgTable, pgEnum, text, integer, boolean, timestamp, jsonb, serial, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createId } from "./id";
 
@@ -185,6 +186,8 @@ export const payments = pgTable("payments", {
   status: payStatus("status").notNull().default("PENDING"),
   testMode: boolean("test_mode").notNull().default(true),
   providerRef: text("provider_ref"),
+  checkoutKey: text("checkout_key"),
+  checkoutUrl: text("checkout_url"),
   failReason: text("fail_reason"),
   createdAt: created(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
@@ -199,7 +202,12 @@ export const payments = pgTable("payments", {
   // НПД receipt ("Мой налог") issued automatically on confirmation.
   npdReceiptId: text("npd_receipt_id"),
   npdError: text("npd_error"),
-}, (t) => [index("payments_company_idx").on(t.companyId), index("payments_status_created").on(t.status, t.createdAt)]);
+}, (t) => [
+  index("payments_company_idx").on(t.companyId),
+  index("payments_status_created").on(t.status, t.createdAt),
+  uniqueIndex("payments_company_checkout_key").on(t.companyId, t.checkoutKey),
+  uniqueIndex("payments_platega_ref").on(t.providerRef).where(sql`${t.provider} = 'platega' AND ${t.providerRef} IS NOT NULL`),
+]);
 
 export const paymentEvents = pgTable("payment_events", {
   id: id(),

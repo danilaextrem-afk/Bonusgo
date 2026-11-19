@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { query } = vi.hoisted(() => ({ query: vi.fn() }));
-vi.mock("@/server/db", () => ({ db: { execute: query } }));
+vi.mock("@/server/db", () => ({ db: { $client: { query } } }));
 
 import { GET as getLiveness } from "@/app/api/live/route";
 import { GET as getReadiness } from "@/app/api/ready/route";
@@ -23,7 +23,7 @@ describe("separate liveness and database readiness", () => {
     const response = await getReadiness();
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledExactlyOnceWith({ text: "SELECT 1", query_timeout: 2_000 });
   });
 
   it("readiness fails closed with HTTP 503 without disclosing database errors", async () => {
@@ -35,6 +35,6 @@ describe("separate liveness and database readiness", () => {
     expect(body).not.toContain("password");
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(response.headers.get("x-robots-tag")).toContain("noindex");
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledExactlyOnceWith({ text: "SELECT 1", query_timeout: 2_000 });
   });
 });

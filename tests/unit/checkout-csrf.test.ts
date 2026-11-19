@@ -47,14 +47,14 @@ describe("subscription checkout CSRF enforcement", () => {
   });
 
   it("accepts session token, authorizes OWNER, and redirects to checkout", async () => {
-    const request = checkoutForm("valid-session-token", { plan: "TOP", months: "3" });
+    const request = checkoutForm("valid-session-token", { plan: "TOP", months: "3", checkoutKey: "33333333-3333-4333-8333-333333333333" });
     const response = await POST(request);
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe("https://checkout.example.test/session");
     expect(assertSameOrigin).toHaveBeenCalledWith(request);
     expect(verifyCsrf).toHaveBeenCalledWith("valid-session-token");
     expect(requireMembership).toHaveBeenCalledWith("company-1", ["OWNER"]);
-    expect(createPaymentOrder).toHaveBeenCalledWith("company-1", "TOP", 3, { id: "user-1", email: "owner@example.test" });
+    expect(createPaymentOrder).toHaveBeenCalledWith("company-1", "TOP", 3, { id: "user-1", email: "owner@example.test" }, "33333333-3333-4333-8333-333333333333");
   });
 
   it("rejects cross-origin requests before checking CSRF", async () => {

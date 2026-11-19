@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 /** Platega status callback. 401 on bad credentials, 500 makes Platega retry (3× every 5 min). */
 export async function POST(req: Request) {
   if (!plategaCallbackAuthorized(req.headers)) {
-    await audit("error.platega_callback_unauthorized", {});
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   let body: { id?: unknown };
@@ -18,14 +17,14 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "bad_body" }, { status: 400 });
   }
-  if (typeof body.id !== "string") return NextResponse.json({ ok: false, error: "bad_body" }, { status: 400 });
+  if (!body || typeof body.id !== "string") return NextResponse.json({ ok: false, error: "bad_body" }, { status: 400 });
   try {
     const verified = await verifyPlategaTransaction(body.id);
     if (!verified) return NextResponse.json({ ok: true, ignored: true });
     const r = await processNotification("platega", verified);
     return NextResponse.json({ ok: r.ok });
-  } catch (e) {
-    await audit("error.platega_callback_failed", { meta: { message: (e instanceof Error ? e.message : String(e)).slice(0, 200) } });
+  } catch {
+    await audit("error.platega_callback_failed", {});
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

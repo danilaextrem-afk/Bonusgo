@@ -15,5 +15,5 @@ export default defineConfig({
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "android", use: { ...devices["Pixel 7"] } },
   ],
-  webServer: { command: `npm run start -- -p ${PORT}`, port: PORT, reuseExistingServer: !process.env.CI, timeout: 120_000 },
+  webServer: { command: `npm run start -- -H 127.0.0.1 -p ${PORT}`, port: PORT, reuseExistingServer: !process.env.CI, timeout: 120_000 },
 });

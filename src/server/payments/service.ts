@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { and, count, desc, eq, gt, lt, ne, sql } from "drizzle-orm";
 import { COUNTRY, PLAN_PRICES, type CountryCode } from "@/lib/plans";
 import { audit } from "@/server/audit";
@@ -7,6 +8,7 @@ import { confirmReferral } from "@/server/loyalty/service";
 import { PROVIDERS, providerFor } from "./registry";
 import { issueSbpReceipt as issuePaymentReceipt } from "./sbp";
 import { PLATEGA_MAX_MINOR } from "./platega";
+import { parsePlategaCheckoutUrl } from "./platega-response";
 import { PaymentError, testModeOn, testPaymentsMayActivate, type ProviderId, type VerifiedNotification } from "./types";
 
 export type PaidPlan = "PRO" | "TOP";
@@ -20,7 +22,7 @@ export function priceFor(country: CountryCode, plan: PaidPlan, months: Months): 
 export { addMonths } from "./dates";
 import { addMonths } from "./dates";
 
-export async function createPaymentOrder(companyId: string, plan: PaidPlan, months: Months, payer?: { id: string; email: string }) {
+export async function createPaymentOrder(companyId: string, plan: PaidPlan, months: Months, payer?: { id: string; email: string }, requestKey?: string) {
   if (plan !== "PRO" && plan !== "TOP") throw new PaymentError("Неизвестный тариф", "bad_plan");
   if (![1, 3, 12].includes(months)) throw new PaymentError("Недопустимый срок", "bad_months");
   const [company] = await db.select().from(schema.companies).where(eq(schema.companies.id, companyId)).limit(1);
@@ -33,6 +35,12 @@ export async function createPaymentOrder(companyId: string, plan: PaidPlan, mont
   if (provider.id === "platega" && !payer) {
     throw new PaymentError("Нужен контакт плательщика для оплаты", "payer_contact_required");
   }
+  if (provider.id === "platega" && !requestKey) {
+    throw new PaymentError("Обновите страницу оплаты и повторите попытку", "checkout_key_required");
+  }
+  const checkoutKey = provider.id === "platega" && payer && requestKey
+    ? createHash("sha256").update(JSON.stringify([payer.id, requestKey])).digest("hex")
+    : null;
   // Manual SBP transfers are always real money; other providers are test unless live.
   const test = provider.id === "sbp" ? false : testModeOn() || !provider.isLive();
   if (!provider.isConfigured() || (provider.id !== "mock" && !testModeOn() && !provider.isLive())) {
@@ -40,13 +48,27 @@ export async function createPaymentOrder(companyId: string, plan: PaidPlan, mont
   }
   const [payment] = await db
     .insert(schema.payments)
-    .values({ companyId, provider: provider.id, plan, months, amountMinor, currency: COUNTRY[company.country].currency, status: "PENDING", testMode: test })
+    .values({ companyId, provider: provider.id, plan, months, amountMinor, currency: COUNTRY[company.country].currency, status: "PENDING", testMode: test, checkoutKey })
+    .onConflictDoNothing({ target: [schema.payments.companyId, schema.payments.checkoutKey] })
     .returning();
+  if (!payment) {
+    const [previous] = await db.select().from(schema.payments).where(and(
+      eq(schema.payments.companyId, companyId),
+      eq(schema.payments.checkoutKey, checkoutKey!),
+    )).limit(1);
+    if (!previous || previous.plan !== plan || previous.months !== months ||
+        previous.amountMinor !== amountMinor || previous.provider !== provider.id) {
+      throw new PaymentError("Параметры повторной оплаты изменились. Обновите страницу.", "checkout_conflict");
+    }
+    const redirectUrl = previous.status === "PENDING" ? parsePlategaCheckoutUrl(previous.checkoutUrl ?? undefined) : null;
+    if (!redirectUrl) throw new PaymentError("Проверьте статус предыдущего платежа", "checkout_in_progress");
+    return { paymentId: previous.id, invoiceNo: previous.invoiceNo, redirectUrl };
+  }
   try {
     const { redirectUrl } = await provider.createCheckout(payment, company, payer);
     return { paymentId: payment.id, invoiceNo: payment.invoiceNo, redirectUrl };
   } catch (e) {
-    await db.update(schema.payments).set({ status: "FAILED", failReason: e instanceof Error ? e.message.slice(0, 200) : "checkout_error" }).where(eq(schema.payments.id, payment.id));
+    await db.update(schema.payments).set({ status: "FAILED", failReason: e instanceof PaymentError ? e.code : "checkout_error" }).where(eq(schema.payments.id, payment.id));
     throw e;
   }
 }
@@ -69,10 +91,13 @@ export async function processNotification(providerId: ProviderId, parsed: Verifi
     const [p] = await tx.select().from(schema.payments).where(eq(schema.payments.id, row.id));
     if (p.provider !== providerId) return { ok: false, reason: "provider_mismatch", _companyId: p.companyId, _audit: ["error.payment_provider_mismatch", { expected: p.provider, got: providerId, invoiceNo: p.invoiceNo }] };
 
+    if (providerId === "platega" && (!p.providerRef || parsed.providerRef !== p.providerRef || parsed.currency !== "RUB")) {
+      return { ok: false, reason: "provider_mismatch", _companyId: p.companyId, _audit: ["error.platega_transaction_mismatch", { invoiceNo: p.invoiceNo }] };
+    }
     // Check the amount and currency *before* recording an idempotency event.
     // An invalid notification must not poison the event key and block a valid retry.
     // Failed-payment callbacks intentionally do not require an amount match.
-    if (parsed.kind !== "failed" && (parsed.amountMinor !== p.amountMinor || (parsed.currency && parsed.currency !== p.currency))) {
+    if ((parsed.kind !== "failed" || providerId === "platega") && (parsed.amountMinor !== p.amountMinor || (parsed.currency && parsed.currency !== p.currency))) {
       return { ok: false, reason: "amount_mismatch", _companyId: p.companyId, _audit: ["error.payment_amount_mismatch", { invoiceNo: p.invoiceNo, expected: p.amountMinor, got: parsed.amountMinor, currency: p.currency, gotCurrency: parsed.currency ?? null }] };
     }
 
@@ -114,7 +139,13 @@ export async function processNotification(providerId: ProviderId, parsed: Verifi
       return { ok: true, status: "PAID", changed: true, companyId: p.companyId, _companyId: p.companyId };
     }
 
-    // refunded
+    // A full Platega reversal can arrive before the paid notification. Persist
+    // it without changing access, so a delayed confirmation cannot grant a plan.
+    if (providerId === "platega" && (p.status === "PENDING" ||
+        (p.status === "FAILED" && p.failReason === "platega_canceled"))) {
+      await tx.update(schema.payments).set({ status: "REFUNDED", refundedAt: now }).where(eq(schema.payments.id, p.id));
+      return { ok: true, status: "REFUNDED", changed: true, companyId: p.companyId };
+    }
     if (p.status !== "PAID") return { ok: true, status: p.status, changed: false, companyId: p.companyId };
     await tx.update(schema.payments).set({ status: "REFUNDED", refundedAt: now }).where(eq(schema.payments.id, p.id));
     if (company.plan === p.plan && company.planExpiresAt) {

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { ActionForm } from "@/components/app/ActionForm";
 import { SubmitButton } from "@/components/app/SubmitButton";
 import { UsageBar } from "@/components/app/UsageBar";
@@ -40,6 +41,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       <PageHeader title="Тариф и оплата" subtitle={`Сейчас: ${PLAN_NAMES[plan]}${company.planExpiresAt && plan !== "FREE" ? ` · действует до ${formatDate(company.planExpiresAt).split(",")[0]}` : ""}`} />
       <div className="space-y-4">
         {status === "success" && <Notice tone="warn">Вы вернулись со страницы оплаты. Это ещё не подтверждает списание: тариф активируется после проверки платежа провайдером. Обновите страницу, чтобы увидеть актуальный тариф.</Notice>}
+        {status === "pending" && <Notice tone="warn">По этому запросу уже создан счёт. Проверьте историю оплат перед новой попыткой.</Notice>}
         {status === "unavailable" && <Notice tone="warn">Оплата временно недоступна. Попробуйте позже или напишите нам.</Notice>}
         {status === "fail" && <Notice tone="danger">Платёж не подтверждён на этой странице. Проверьте статус в истории оплат, прежде чем повторять покупку.</Notice>}
         {company.country === "BY" && (
@@ -77,6 +79,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                     <input type="hidden" name="companyId" value={company.id} />
                     <input type="hidden" name="plan" value={p} />
                     <input type="hidden" name="csrf" value={csrf} />
+                    <input type="hidden" name="checkoutKey" value={randomUUID()} />
                     <fieldset>
                       <legend className="label">Срок</legend>
                       <div className="grid grid-cols-3 gap-2">
@@ -112,7 +115,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                 <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span>{h.plan} · {h.months} мес · {formatMoney(h.amountMinor, h.currency)}</span>
                   <span className="text-muted">
-                    {h.status === "PAID" ? "оплачено" : h.status === "PENDING" ? (h.claimedAt ? "на проверке" : "ожидает оплаты") : h.status === "FAILED" ? "не прошла" : h.status.toLowerCase()}
+                    {h.status === "PAID" ? "оплачено" : h.status === "PENDING" ? (h.claimedAt ? "на проверке" : "ожидает оплаты") : h.status === "REFUNDED" ? "возвращено" : h.status === "CANCELED" ? "отменено" : "не прошла"}
                     {h.status === "PENDING" && !h.claimedAt && h.provider === "sbp" && <> · <Link className="text-neon underline" href={`/app/billing/sbp/${h.id}`}>оплатить</Link></>}
                     {h.npdReceiptId && <> · <a className="text-neon underline" href={receiptUrl(h.npdReceiptId)} target="_blank" rel="noreferrer">чек</a></>}
                   </span>

@@ -50,3 +50,11 @@ test("database readiness is independent of Render process liveness", async ({ re
   expect(response.headers()["cache-control"]).toContain("no-store");
   expect(response.headers()["x-robots-tag"]).toContain("noindex");
 });
+
+test("payment information is public and links to the provider review code and documents", async ({ page }) => {
+  await page.goto("/ru/oplata");
+  await expect(page.getByRole("heading", { name: "Оплата и получение доступа" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Когда появится доступ" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "договорных документах" })).toHaveAttribute("href", "/ru/usloviya");
+  await expect(page.locator("[data-provider-verification=platega]")).toContainText("verplatega");
+});

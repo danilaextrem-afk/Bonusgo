@@ -13,7 +13,7 @@
 - Footer shows the temporary literal `verplatega` for merchant verification; remove only after approval.
 - Real price/period and user-visible **Оплатить** action in `/app/billing`. Public `/ru/tarify` and `/by/tarify` include registration route and purchase instructions.
 - Legal pages already exist at `/ru/politika-konfidencialnosti` and `/ru/usloviya`; footer links to both. **Existing legal drafts require lawyer/owner approval and identification.**
-- `/ru/kontakty` and the footer link to support. Set a real working `CONTACT_EMAIL` (no placeholder).
+- `/ru/oplata` explains purchase, delivery of access, refund requests and seller information. `/ru/kontakty` links to support. Set a real working `CONTACT_EMAIL` (no placeholder).
 - Registration requires user email and terms/privacy consent. Platega receives the actual signed-in OWNER's email as `metadata.user_email`, plus a stable system ID as `metadata.userId`. Do not invent email addresses.
 - Access for Platega reviewers: create a separate least-privileged staging business account with fabricated test data via the ordinary registration flow; provide credentials to the provider **through its private authenticated channel, never in code or public issue/PR**. No admin credentials.
 
@@ -26,6 +26,7 @@
 ## Fail-closed live switch — all necessary
 Environment variables in the hosting secret store (never GitHub, documentation or chat):
 - `PLATEGA_MERCHANT_ID`, `PLATEGA_SECRET` from the approved Platega merchant;
+- `PLATEGA_SELLER_PAYS_FEE=true` only after merchant dashboard confirmation;
 - `PLATEGA_LIVE_ENABLED=true` (default false), `PAYMENTS_TEST_MODE=false`, `DEMO_MODE=false`;
 - `CONTACT_EMAIL` (real support mailbox); `OWNER_NAME`, `OWNER_TAX_ID`, `OWNER_ADDRESS` (real operator identification).
 - `APP_URL` must be the publicly reachable HTTPS site.

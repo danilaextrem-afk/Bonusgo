@@ -50,6 +50,7 @@ export function Footer({ country, owner }: { country: CP; owner?: string }) {
           <ul className={col}>
             <li><Link className={link} href={`${b}/politika-konfidencialnosti`}>Политика конфиденциальности</Link></li>
             <li><Link className={link} href={`${b}/usloviya`}>Условия использования</Link></li>
+            <li><Link className={link} href={`${b}/oplata`}>Оплата и получение доступа</Link></li>
             <li><Link className={link} href={`${b}/soglasie`}>Согласие на обработку данных</Link></li>
             <li><Link className={link} href={`${b}/cookies`}>Cookies</Link></li>
           </ul>

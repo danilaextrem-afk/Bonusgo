@@ -3,6 +3,7 @@ import { securityHeaders } from "./src/server/security/headers";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  output: process.env.QRONUS_STANDALONE === "1" ? "standalone" : undefined,
   // Fonts read via fs at runtime for PDF posters must ship with the server bundle.
   outputFileTracingIncludes: {
     "/api/app/poster": ["./src/components/app/fonts/**"],

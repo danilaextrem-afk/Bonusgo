@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
 
@@ -17,7 +16,8 @@ const HEADERS = {
  */
 export async function GET() {
   try {
-    await db.execute(sql`SELECT 1`);
+    const probe = { text: "SELECT 1", query_timeout: 2_000 };
+    await db.$client.query(probe);
     return NextResponse.json({ ok: true }, { headers: HEADERS });
   } catch {
     return NextResponse.json({ ok: false }, { status: 503, headers: HEADERS });
