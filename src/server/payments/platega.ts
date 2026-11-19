@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/server/db";
 import { PaymentError, appUrl, formatMajor, parseMinor, type PaymentProvider, type VerifiedNotification } from "./types";
+import { parsePlategaCheckoutResponse } from "./platega-response";
 
 /**
  * Platega.io, RUB: https://docs.platega.io/ (checked 2026-11-19).
@@ -78,11 +79,8 @@ export const platega: PaymentProvider = {
     const text = await res.text();
     if (!res.ok) throw new PaymentError(`Platega: HTTP ${res.status}`, "provider_error");
     // Provider response bodies can contain sensitive details; never echo them into application errors.
-    let body: { redirect?: string; transactionId?: string };
-    try { body = JSON.parse(text) as typeof body; }
-    catch { throw new PaymentError("Platega вернула некорректный ответ", "provider_error"); }
-    if (!body || typeof body !== "object")
-      throw new PaymentError("Platega вернула некорректный ответ", "provider_error");
+    const body = parsePlategaCheckoutResponse(text);
+    if (!body) throw new PaymentError("Platega вернула некорректный ответ", "provider_error");
     if (!body.transactionId || !UUID.test(body.transactionId))
       throw new PaymentError("Platega не вернула идентификатор транзакции", "provider_error");
     let redirect: URL;
