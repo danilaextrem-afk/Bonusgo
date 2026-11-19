@@ -28,7 +28,7 @@ test("SBP: pay → instant grace → admin confirms", async ({ browser }, info) 
   await register(bp, `sbp-${Date.now()}-${info.project.name}@example.test`, company);
 
   await bp.goto("/app/billing");
-  await bp.locator("form").filter({ hasText: "Перейти на PRO" }).getByRole("button", { name: "Перейти на PRO" }).click();
+  await bp.locator("form").filter({ hasText: "Оплатить PRO" }).getByRole("button", { name: "Оплатить PRO" }).click();
   await bp.waitForURL(/\/app\/billing\/sbp\//);
   await expect(bp.getByText("Т-Банк")).toBeVisible();
   await expect(bp.getByText(/BG-\d+/).first()).toBeVisible();
