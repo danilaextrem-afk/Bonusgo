@@ -17,3 +17,18 @@ test("health exposes a safe, non-cached deployment revision", async ({ request }
   expect(payload.revision === null || (typeof payload.revision === "string" && /^[a-f0-9]{12}$/.test(payload.revision))).toBe(true);
   expect(Object.keys(payload).sort()).toEqual(["ok", "revision", "time"]);
 });
+
+
+test("version endpoint is a side-effect-free, non-cached deployment probe", async ({ request }) => {
+  const first = await request.get("/api/version");
+  const second = await request.get("/api/version");
+  for (const response of [first, second]) {
+    expect(response.status()).toBe(200);
+    expect(response.headers()["cache-control"]).toContain("no-store");
+    expect(response.headers()["x-robots-tag"]).toContain("noindex");
+    const payload = (await response.json()) as Record<string, unknown>;
+    expect(Object.keys(payload)).toEqual(["revision"]);
+    expect(payload.revision === null || (typeof payload.revision === "string" && /^[a-f0-9]{12}$/.test(payload.revision))).toBe(true);
+  }
+  expect(await first.json()).toEqual(await second.json());
+});
