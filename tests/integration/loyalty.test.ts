@@ -144,6 +144,53 @@ describe("operations", () => {
     expect(await db.select().from(schema.transactions)).toHaveLength(1);
   });
 
+  it("refuses to replay an idempotency key for another action, program or staff member", async () => {
+    const s = await makeSetup({ plan: "TOP", stampsRequired: 3 });
+    const cust = await makeUser();
+    const sameKey = key();
+    const base = { actorUserId: s.owner.id, companyId: s.company.id, programId: s.program.id };
+    const first = await accrue({ ...base, customerToken: await qr(cust.id), stamps: 3, idempotencyKey: sameKey });
+
+    await expect(redeem({ ...base, customerToken: await qr(cust.id), idempotencyKey: sameKey }))
+      .rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT", status: 409 });
+
+    const extra = await createProgram(s.company.id, {
+      venueId: s.venue.id, type: "STAMPS", name: "Вторая программа", rewardText: "Кофе",
+    });
+    await expect(accrue({ ...base, programId: extra.id, customerToken: await qr(cust.id), idempotencyKey: sameKey }))
+      .rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT", status: 409 });
+
+    const otherStaff = await makeUser();
+    await addStaff(s.company.id, { email: otherStaff.email, role: "MANAGER" });
+    await expect(accrue({ ...base, actorUserId: otherStaff.id, customerToken: await qr(cust.id), idempotencyKey: sameKey }))
+      .rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT", status: 409 });
+
+    // A genuine retry of the same actor/action/program remains idempotent.
+    const replay = await accrue({ ...base, customerToken: "BG1.invalid-retry-token-xx", idempotencyKey: sameKey });
+    expect(replay.duplicated).toBe(true);
+    expect(replay.transaction.id).toBe(first.transaction.id);
+    expect(replay.card.balance).toBe(3);
+    expect(await db.select().from(schema.transactions)).toHaveLength(1);
+  });
+
+  it("two concurrent redemptions cannot overdraw a stamp balance", async () => {
+    const s = await makeSetup({ stampsRequired: 3 });
+    const cust = await makeUser();
+    const base = { actorUserId: s.owner.id, companyId: s.company.id, programId: s.program.id };
+    await accrue({ ...base, customerToken: await qr(cust.id), stamps: 3, idempotencyKey: key() });
+    const tokens = await Promise.all([qr(cust.id), qr(cust.id)]);
+    const attempts = await Promise.allSettled(tokens.map((customerToken) =>
+      redeem({ ...base, customerToken, idempotencyKey: key() }),
+    ));
+    expect(attempts.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const failures = attempts.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+    expect(failures).toHaveLength(1);
+    expect(failures[0].reason).toMatchObject({ code: "INSUFFICIENT_BALANCE" });
+    const [card] = await db.select().from(schema.cards).where(eq(schema.cards.customerId, cust.id));
+    expect(card.balance).toBe(0);
+    expect(await db.select().from(schema.transactions)).toHaveLength(2);
+  });
+
   it("10 concurrent accruals → balance 10", async () => {
     const s = await makeSetup();
     const cust = await makeUser();
