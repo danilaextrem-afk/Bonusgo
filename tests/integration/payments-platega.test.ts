@@ -7,7 +7,7 @@ vi.mock("@/server/loyalty/service", () => ({ confirmReferral: vi.fn(async () => 
 import { db, schema } from "@/server/db";
 import { createId } from "@/server/id";
 import { platega } from "@/server/payments/platega";
-import { createPaymentOrder } from "@/server/payments/service";
+import { createPaymentOrder, refreshPlategaPayment } from "@/server/payments/service";
 import { POST as callback } from "@/app/api/payments/platega/callback/route";
 
 const clean = () => db.execute(sql`TRUNCATE payment_events, payments, subscriptions, companies RESTART IDENTITY CASCADE`);
@@ -158,6 +158,35 @@ describe("Platega", () => {
     }
     expect((await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0].plan).toBe("FREE");
     expect((await db.select().from(schema.payments).where(eq(schema.payments.id, p.id)))[0].status).toBe("REFUNDED");
+  });
+
+  it("recovers a confirmed Platega payment without a callback and rejects other companies", async () => {
+    const { c, p } = await checkout();
+    const other = await company();
+    expect(await refreshPlategaPayment(other.id, p.id)).toBe("refresh-unavailable");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const providerStatus = () => json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 490, currency: "RUB" } });
+    fetchMock.mockImplementation(async () => providerStatus());
+    const parallel = await Promise.all([refreshPlategaPayment(c.id, p.id), refreshPlategaPayment(c.id, p.id)]);
+    expect(parallel).toContain("refresh-checked");
+    expect(parallel.every((state) => ["refresh-checked", "refresh-limited", "refresh-unavailable"].includes(state))).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const paid = (await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0];
+    expect(paid.plan).toBe("PRO");
+    expect((await cb({ id: p.providerRef })).status).toBe(200);
+    const after = (await db.select().from(schema.companies).where(eq(schema.companies.id, c.id)))[0];
+    expect(after.planExpiresAt).toEqual(paid.planExpiresAt);
+  });
+
+  it("keeps the invoice pending and throttles manual refresh on an unconfirmed amount", async () => {
+    const { c, p } = await checkout();
+    fetchMock.mockResolvedValueOnce(json({ id: p.providerRef, status: "CONFIRMED", paymentDetails: { amount: 1, currency: "RUB" } }));
+    expect(await refreshPlategaPayment(c.id, p.id)).toBe("refresh-unconfirmed");
+    expect(await refreshPlategaPayment(c.id, p.id)).toBe("refresh-limited");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect((await db.select().from(schema.payments).where(eq(schema.payments.id, p.id)))[0].status).toBe("PENDING");
   });
 
   it("rejects callbacks with wrong credentials", async () => {

@@ -13,8 +13,8 @@ import { db, schema } from "@/server/db";
 import { receiptUrl } from "@/server/payments/npd";
 import { cancelSubscriptionAction } from "../actions";
 import { providerFor } from "@/server/payments/registry";
-import { priceFor, type Months } from "@/server/payments/service";
-import { PLATEGA_MAX_MINOR } from "@/server/payments/platega";
+import { canRefreshPlategaPayment, priceFor, type Months } from "@/server/payments/service";
+import { PLATEGA_MAX_MINOR, plategaConfigured } from "@/server/payments/platega";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +41,10 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       <PageHeader title="Тариф и оплата" subtitle={`Сейчас: ${PLAN_NAMES[plan]}${company.planExpiresAt && plan !== "FREE" ? ` · действует до ${formatDate(company.planExpiresAt).split(",")[0]}` : ""}`} />
       <div className="space-y-4">
         {status === "success" && <Notice tone="warn">Вы вернулись со страницы оплаты. Это ещё не подтверждает списание: тариф активируется после проверки платежа провайдером. Обновите страницу, чтобы увидеть актуальный тариф.</Notice>}
+        {status === "refresh-checked" && <Notice tone="warn">Статус проверен у Platega. Результат указан в истории оплат.</Notice>}
+        {status === "refresh-unconfirmed" && <Notice tone="warn">Пока нет подтверждения от Platega. Если деньги списались, проверьте платёж чуть позже.</Notice>}
+        {status === "refresh-limited" && <Notice tone="warn">Этот платёж недавно проверяли. Попробуйте через минуту.</Notice>}
+        {status === "refresh-unavailable" && <Notice tone="warn">Сейчас не удалось проверить платёж. Посмотрите историю оплат или обратитесь в поддержку.</Notice>}
         {status === "pending" && <Notice tone="warn">По этому запросу уже создан счёт. Проверьте историю оплат перед новой попыткой.</Notice>}
         {status === "unavailable" && <Notice tone="warn">Оплата временно недоступна. Попробуйте позже или напишите нам.</Notice>}
         {status === "fail" && <Notice tone="danger">Платёж не подтверждён на этой странице. Проверьте статус в истории оплат, прежде чем повторять покупку.</Notice>}
@@ -119,6 +123,14 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                     {h.status === "PENDING" && !h.claimedAt && h.provider === "sbp" && <> · <Link className="text-neon underline" href={`/app/billing/sbp/${h.id}`}>оплатить</Link></>}
                     {h.npdReceiptId && <> · <a className="text-neon underline" href={receiptUrl(h.npdReceiptId)} target="_blank" rel="noreferrer">чек</a></>}
                   </span>
+                  {isOwner && plategaConfigured() && canRefreshPlategaPayment(h) && (
+                    <form method="POST" action="/api/payments/platega/refresh">
+                      <input type="hidden" name="companyId" value={company.id} />
+                      <input type="hidden" name="paymentId" value={h.id} />
+                      <input type="hidden" name="csrf" value={csrf} />
+                      <SubmitButton className="btn-ghost">Проверить платёж</SubmitButton>
+                    </form>
+                  )}
                 </li>
               ))}
             </ul>

@@ -4,10 +4,11 @@ import { and, count, desc, eq, gt, lt, ne, sql } from "drizzle-orm";
 import { COUNTRY, PLAN_PRICES, type CountryCode } from "@/lib/plans";
 import { audit } from "@/server/audit";
 import { db, schema } from "@/server/db";
+import { rateLimit } from "@/server/security/rateLimit";
 import { confirmReferral } from "@/server/loyalty/service";
 import { PROVIDERS, providerFor } from "./registry";
 import { issueSbpReceipt as issuePaymentReceipt } from "./sbp";
-import { PLATEGA_MAX_MINOR } from "./platega";
+import { PLATEGA_MAX_MINOR, plategaConfigured, verifyPlategaTransaction } from "./platega";
 import { parsePlategaCheckoutUrl } from "./platega-response";
 import { PaymentError, testModeOn, testPaymentsMayActivate, type ProviderId, type VerifiedNotification } from "./types";
 
@@ -70,6 +71,32 @@ export async function createPaymentOrder(companyId: string, plan: PaidPlan, mont
   } catch (e) {
     await db.update(schema.payments).set({ status: "FAILED", failReason: e instanceof PaymentError ? e.code : "checkout_error" }).where(eq(schema.payments.id, payment.id));
     throw e;
+  }
+}
+
+type PaymentStatusRow = Pick<typeof schema.payments.$inferSelect, "provider" | "providerRef" | "status" | "failReason" | "testMode">;
+
+export function canRefreshPlategaPayment(payment: PaymentStatusRow) {
+  return payment.provider === "platega" && Boolean(payment.providerRef) && !payment.testMode &&
+    (payment.status === "PENDING" || (payment.status === "FAILED" && payment.failReason === "platega_canceled"));
+}
+
+/** Checks an existing company invoice. The client never supplies a provider transaction ID. */
+export async function refreshPlategaPayment(companyId: string, paymentId: string) {
+  const [payment] = await db.select().from(schema.payments).where(and(
+    eq(schema.payments.companyId, companyId),
+    eq(schema.payments.id, paymentId),
+  )).limit(1);
+  if (!payment || !payment.providerRef || !canRefreshPlategaPayment(payment) || !plategaConfigured()) return "refresh-unavailable";
+  if (!(await rateLimit(`platega-refresh:${payment.id}`, 1, 60)).ok) return "refresh-limited";
+  try {
+    const verified = await verifyPlategaTransaction(payment.providerRef);
+    if (!verified) return "refresh-unconfirmed";
+    const result = await processNotification("platega", verified);
+    return result.ok ? "refresh-checked" : "refresh-unavailable";
+  } catch {
+    await audit("error.platega_manual_refresh", { companyId, meta: { invoiceNo: payment.invoiceNo } }).catch(() => {});
+    return "refresh-unavailable";
   }
 }
 

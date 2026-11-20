@@ -8,12 +8,14 @@ vi.mock("@/server/tenancy", () => ({
   requireMembership: vi.fn(async () => ({ user: { id: "user-1", email: "owner@example.test" }, membership: { role: "OWNER" } })),
 }));
 vi.mock("@/server/payments/service", () => ({
+  refreshPlategaPayment: vi.fn(async () => "refresh-checked"),
   createPaymentOrder: vi.fn(async () => ({ redirectUrl: "https://checkout.example.test/session" })),
 }));
 
 import { POST } from "@/app/api/payments/checkout/route";
+import { POST as refresh } from "@/app/api/payments/platega/refresh/route";
 import { assertSameOrigin, verifyCsrf } from "@/server/auth/session";
-import { createPaymentOrder } from "@/server/payments/service";
+import { createPaymentOrder, refreshPlategaPayment } from "@/server/payments/service";
 import { requireMembership } from "@/server/tenancy";
 import { ForbiddenError } from "@/server/errors";
 
@@ -77,5 +79,27 @@ describe("subscription checkout CSRF enforcement", () => {
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toContain("/app/billing?status=error");
     expect(createPaymentOrder).not.toHaveBeenCalled();
+  });
+});
+
+describe("manual Platega refresh", () => {
+  const companyId = "A".repeat(22);
+  const paymentId = "B".repeat(22);
+
+  it("authorizes an owner before passing internal IDs to reconciliation", async () => {
+    const response = await refresh(checkoutForm("valid-session-token", { companyId, paymentId }));
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toContain("status=refresh-checked");
+    expect(requireMembership).toHaveBeenCalledWith(companyId, ["OWNER"]);
+    expect(refreshPlategaPayment).toHaveBeenCalledExactlyOnceWith(companyId, paymentId);
+  });
+
+  it("rejects invalid CSRF and members without the owner role", async () => {
+    const ids = { companyId, paymentId };
+    expect((await refresh(checkoutForm("forged", ids))).status).toBe(403);
+    expect(requireMembership).not.toHaveBeenCalled();
+    vi.mocked(requireMembership).mockRejectedValueOnce(new ForbiddenError());
+    expect((await refresh(checkoutForm("valid-session-token", ids))).status).toBe(403);
+    expect(refreshPlategaPayment).not.toHaveBeenCalled();
   });
 });
